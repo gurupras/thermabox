@@ -7,23 +7,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRelay(t *testing.T) {
-	require := require.New(t)
-
-	relay, err := NewRelay(true, []int{23, 22})
+func getRelay(require *require.Assertions) *Relay {
+	relay, err := NewRelay(false, []int{23, 22})
 	require.Nil(err)
 	require.NotNil(relay)
+	return relay
+}
+
+func TestRelay(t *testing.T) {
+	require := require.New(t)
+	getRelay(require)
+	// Add a small delay here to ensure that multiple tests don't toggle relay too quickly
+	time.Sleep(300 * time.Millisecond)
 }
 
 func TestRelayToggle(t *testing.T) {
 	require := require.New(t)
 
-	relay, err := NewRelay(false, []int{23, 22})
-	require.Nil(err)
-	require.NotNil(relay)
+	relay := getRelay(require)
 
 	// Test switch 1
-	err = relay.Toggle(1)
+	err := relay.Toggle(1)
 	require.Nil(err)
 	time.Sleep(500 * time.Millisecond)
 	err = relay.Toggle(1)
@@ -41,12 +45,10 @@ func TestRelayToggle(t *testing.T) {
 func TestRelayOnOff(t *testing.T) {
 	require := require.New(t)
 
-	relay, err := NewRelay(false, []int{23, 22})
-	require.Nil(err)
-	require.NotNil(relay)
+	relay := getRelay(require)
 
 	// Test switch 1
-	err = relay.On(1)
+	err := relay.On(1)
 	require.Nil(err)
 	time.Sleep(500 * time.Millisecond)
 	err = relay.Off(1)
