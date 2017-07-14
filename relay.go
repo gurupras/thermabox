@@ -23,7 +23,7 @@ func NewRelay(activeHigh bool, gpioPins []int) (*Relay, error) {
 	for idx, gpioPin := range gpioPins {
 		pin := rpio.Pin(gpioPin)
 		// Update switchMap
-		switchMap[idx] = uint8(pin)
+		switchMap[idx+1] = uint8(pin)
 		// Set pin to output mode
 		pin.Output()
 		// Turn it off
