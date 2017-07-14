@@ -29,6 +29,7 @@ func TestRelayToggle(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	err = relay.Toggle(1)
 	require.Nil(err)
+	time.Sleep(500 * time.Millisecond)
 
 	// Test switch 2
 	err = relay.Toggle(2)
