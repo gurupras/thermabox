@@ -1,0 +1,33 @@
+nav {
+}
+
+.nav-wrapper {
+	background-color: #c0c5c9;
+	background-image: -webkit-gradient(linear, left 0%, left 100%, from(#dbdee1), to(#c0c5c9));
+	background-image: -webkit-linear-gradient(top, #dbdee1, 0%, #c0c5c9, 100%);
+	background-image: -moz-linear-gradient(top, #dbdee1 0%, #c0c5c9 100%);
+	background-image: linear-gradient(to bottom, #dbdee1 0%, #c0c5c9 100%);
+	background-repeat: repeat-x;
+	filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffdbdee1', endColorstr='#ffc0c5c9', GradientType=0);
+}
+
+.brand-logo {
+	margin-left: 0.1em;
+	color: #000 !important;
+}
+
+nav ul router-link {
+	color: #000;
+}
+
+#navbar-ul {
+	margin-left: 13em;
+}
+
+#wifi-scan-results {
+	overflow-y: auto;
+}
+
+#wifi-scan-trigger.disabled {
+	color: grey;
+}

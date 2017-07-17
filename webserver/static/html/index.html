@@ -1,0 +1,60 @@
+<html>
+	<head>
+		<link type="text/css" rel="stylesheet" href="/static/fonts/material-icons">
+		<link type="text/css" rel="stylesheet" href="/static/materialize/css/materialize.min.css">
+		<link type="text/css" rel="stylesheet" href="/static/css/main.css">
+
+		<script src="/static/js/jquery-2.1.1.min.js"></script>
+		<script src="/static/materialize/js/materialize.min.js"></script>
+		<script src="/static/js/socket.io.min.js"></script>
+		<script src="/static/js/index.js"></script>
+	</head>
+
+	<body>
+		<div class="container">
+			<nav>
+				<div class="nav-wrapper">
+					<a href="#" class="brand-logo">ThermaBox</a>
+					<a href="#" data-activates="mobile-nav" class="button-collapse"><i class="material-icons">menu</i></a>
+					<ul id="navbar-ul" class="hide-on-med-and-down right">
+					</ul>
+					<ul id="mobile-nav" class="side-nav" style="display: none;">
+					</ul>
+				</div>
+			</nav>
+
+
+			<div class="row" style="height: 50%; margin-top: 5em;">
+				<div class="row">
+					<div class="col s6">
+						<h> ThermaBox Limits </h>
+						<div class="row">
+							<div class="input-field col s3">
+								<input id="temperature" placeholder="Enter temperature" type="number">
+								<label class="active" for="temperature">Temperature</label>
+							</div>
+						</div>
+
+						<div class="row">
+							<div class="input-field col s3">
+								<input id="threshold" placeholder="+/- threshold" type="number">
+								<label class="active" for="threshold">Threshold Limits</label>
+							</div>
+						</div>
+
+						<div class="row">
+							<div class="col s1">
+								<a id="sync" class="waves-effect waves-light btn">upload</a>
+							</div>
+						</div>
+					</div>
+					<div class="col s3 right">
+						<div id="currentTempDiv" class="right">
+							<span> Current Temperature: </span><span id="currentTemp"></span><span>°C</span>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
