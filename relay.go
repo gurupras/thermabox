@@ -7,9 +7,37 @@ import (
 )
 
 type Relay struct {
-	activeHigh bool
-	pins       []rpio.Pin
+	activeHigh bool       `yaml:"active_high"`
+	pins       []rpio.Pin `yaml:"pins"`
 	SwitchMap  map[int]uint8
+}
+
+func (r *Relay) ActiveHigh() bool {
+	return r.activeHigh
+}
+
+func (r *Relay) GetSwitchMap() map[int]uint8 {
+	return r.SwitchMap
+}
+
+func (r *Relay) UnmarshalYAML(unmarshal func(i interface{}) error) error {
+	m := make(map[string]interface{})
+	err := unmarshal(&m)
+	if err != nil {
+		return err
+	}
+	activeHigh := m["active_high"].(bool)
+	pinsInterface := m["pins"].([]interface{})
+	pins := make([]int, len(pinsInterface))
+	for i := 0; i < len(pins); i++ {
+		pins[i] = pinsInterface[i].(int)
+	}
+	relay, err := NewRelay(activeHigh, pins)
+	if err != nil {
+		return err
+	}
+	*r = *relay
+	return nil
 }
 
 func NewRelay(activeHigh bool, gpioPins []int) (*Relay, error) {
