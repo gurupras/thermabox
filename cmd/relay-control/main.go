@@ -5,10 +5,16 @@ import (
 	"os"
 	"time"
 
+	"github.com/alecthomas/kingpin"
 	"github.com/gurupras/thermabox"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/stianeikeland/go-rpio"
+)
+
+var (
+	app = kingpin.New("relay-control", "Relay control")
+	pin = app.Arg("pin", "Pin to control").Default("24").Int()
 )
 
 func main() {
@@ -17,7 +23,7 @@ func main() {
 		log.Fatalf("Error in rpio.Open: %v", err)
 	}
 
-	relay, err := thermabox.NewRelay(false, []int{22})
+	relay, err := thermabox.NewRelay(false, []int{*pin})
 	if err != nil {
 		log.Fatalf("Error in new relay: %v", err)
 	}
