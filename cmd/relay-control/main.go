@@ -13,11 +13,19 @@ import (
 )
 
 var (
-	app = kingpin.New("relay-control", "Relay control")
-	pin = app.Arg("pin", "Pin to control").Default("24").Int()
+	app     = kingpin.New("relay-control", "Relay control")
+	pin     = app.Arg("pin", "Pin to control").Default("24").Int()
+	verbose = app.Flag("verbose", "Verbose logging").Default("false").Bool()
 )
 
 func main() {
+	kingpin.MustParse(app.Parse(os.Args[1:]))
+
+	if *verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+	log.Infof("Testing pin: %v", *pin)
+
 	err := rpio.Open()
 	if err != nil {
 		log.Fatalf("Error in rpio.Open: %v", err)
