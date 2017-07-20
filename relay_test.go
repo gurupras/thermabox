@@ -11,15 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type RelayInterface interface {
-	yaml.Unmarshaler
-	ActiveHigh() bool
-	Toggle(swtch int) error
-	On(swtch int) error
-	Off(swtch int) error
-	GetSwitchMap() map[int]uint8
-}
-
 type FakeRelay struct {
 	activeHigh bool       `yaml:"active_high"`
 	pins       []rpio.Pin `yaml:"pins"`
