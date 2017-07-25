@@ -200,7 +200,7 @@ func (t *Thermabox) Run() error {
 			if err := t.coolingElement.On(); err != nil {
 				log.Errorf("Failed to turn on heating element: %v", err)
 			}
-		} else if temp >= t.temperature-t.threshold && temp <= t.temperature+t.threshold {
+		} else if temp > t.temperature-t.threshold && temp < t.temperature+t.threshold {
 			curState = STABLE
 			if err := t.heatingElement.Off(); err != nil {
 				log.Errorf("Failed to turn off heating element: %v", err)
@@ -213,6 +213,6 @@ func (t *Thermabox) Run() error {
 			log.Infof("temp=%.2f target=%.2f threshold=%.2f -> %v", temp, t.temperature, t.threshold, curState)
 			lastState = curState
 		}
-		time.Sleep(100 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
