@@ -14,6 +14,7 @@ type RelayInterface interface {
 	Toggle(swtch int) error
 	On(swtch int) error
 	Off(swtch int) error
+	IsOn(swtch int) (bool, error)
 	GetSwitchMap() map[int]uint8
 }
 
@@ -117,4 +118,21 @@ func (r *Relay) Off(swtch int) error {
 		}
 	}
 	return nil
+}
+
+func (r *Relay) IsOn(swtch int) (bool, error) {
+	if p, ok := r.SwitchMap[swtch]; !ok {
+		return false, fmt.Errorf("Switch %v not initialized in relay", swtch)
+	} else {
+		pin := rpio.Pin(p)
+		state := pin.Read()
+		var onState rpio.State
+		switch r.activeHigh {
+		case true:
+			onState = rpio.High
+		case false:
+			onState = rpio.Low
+		}
+		return state == onState, nil
+	}
 }

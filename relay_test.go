@@ -7,6 +7,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stianeikeland/go-rpio"
 	"github.com/stretchr/testify/require"
 )
@@ -27,6 +28,7 @@ func (f *FakeRelay) commonHandle(swtch int) error {
 		return nil
 	}
 }
+
 func (f *FakeRelay) Toggle(swtch int) error {
 	return f.commonHandle(swtch)
 }
@@ -39,6 +41,12 @@ func (f *FakeRelay) Off(swtch int) error {
 
 func (f *FakeRelay) GetSwitchMap() map[int]uint8 {
 	return f.SwitchMap
+}
+
+// TODO: Properly implement IsOn() after a fake rpio.Pin interface is implemented
+func (f *FakeRelay) IsOn(swtch int) (bool, error) {
+	log.Warnf("IsOn() hasn't been implemented!")
+	return false, nil
 }
 
 func (f *FakeRelay) UnmarshalYAML(unmarshal func(i interface{}) error) error {
