@@ -10,6 +10,15 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type State string
+
+const (
+	HEATING_UP   string = "heating_up"
+	COOLING_DOWN string = "cooling_down"
+	STABLE       string = "stable"
+	UNKNOWN      string = "unknown"
+)
+
 type TemperatureSensorInterface interface {
 	Temperature() (float64, error)
 }
@@ -169,9 +178,14 @@ func (t *Thermabox) Run() error {
 		if err != nil {
 			log.Errorf("Failed to get temperature: %v", err)
 		}
+
+		lastState := UNKNOWN
+		curState := UNKNOWN
+
 		if temp <= t.temperature-t.threshold {
 			// Temperature has dropped below threshold
 			// Start heating element to warm it back up
+			curState = HEATING_UP
 			if err := t.coolingElement.Off(); err != nil {
 				log.Errorf("Failed to turn off cooling element: %v", err)
 			}
@@ -179,14 +193,26 @@ func (t *Thermabox) Run() error {
 				log.Errorf("Failed to turn on heating element: %v", err)
 			}
 		} else if temp >= t.temperature+t.threshold {
+			curState = COOLING_DOWN
 			if err := t.heatingElement.Off(); err != nil {
 				log.Errorf("Failed to turn off heating element: %v", err)
 			}
 			if err := t.coolingElement.On(); err != nil {
 				log.Errorf("Failed to turn on heating element: %v", err)
 			}
-		} else {
-			time.Sleep(100 * time.Second)
+		} else if temp >= t.temperature-t.threshold && temp <= t.temperature+t.threshold {
+			curState = STABLE
+			if err := t.heatingElement.Off(); err != nil {
+				log.Errorf("Failed to turn off heating element: %v", err)
+			}
+			if err := t.coolingElement.Off(); err != nil {
+				log.Errorf("Failed to turn off heating element: %v", err)
+			}
 		}
+		if lastState != curState {
+			log.Infof("%v", curState)
+			lastState = curState
+		}
+		time.Sleep(100 * time.Second)
 	}
 }
