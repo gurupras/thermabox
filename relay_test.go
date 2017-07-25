@@ -88,7 +88,7 @@ func TestParseRelayYaml(t *testing.T) {
 	require := require.New(t)
 
 	str := `
-active_high: false
+active_high: true
 pins: [14, 17, 18]
 `
 
