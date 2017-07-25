@@ -46,11 +46,8 @@ func (r *Relay) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	for i := 0; i < len(pins); i++ {
 		pins[i] = pinsInterface[i].(int)
 	}
-	relay, err := NewRelay(activeHigh, pins)
-	if err != nil {
-		return err
-	}
-	*r = *relay
+	r.activeHigh = activeHigh
+	r.buildSwitchMap(pins)
 	return nil
 }
 
@@ -58,7 +55,13 @@ func NewRelay(activeHigh bool, gpioPins []int) (*Relay, error) {
 	if err := rpio.Open(); err != nil {
 		return nil, fmt.Errorf("Failed to call rpio.Open(): %v", err)
 	}
+	r := &Relay{}
+	r.activeHigh = activeHigh
+	r.buildSwitchMap(gpioPins)
+	return r, nil
+}
 
+func (r *Relay) buildSwitchMap(gpioPins []int) error {
 	pins := make([]rpio.Pin, len(gpioPins))
 	switchMap := make(map[int]uint8)
 
@@ -69,7 +72,7 @@ func NewRelay(activeHigh bool, gpioPins []int) (*Relay, error) {
 		// Set pin to output mode
 		pin.Output()
 		// Turn it off
-		switch activeHigh {
+		switch r.activeHigh {
 		case true:
 			pin.Low()
 		case false:
@@ -77,9 +80,9 @@ func NewRelay(activeHigh bool, gpioPins []int) (*Relay, error) {
 		}
 		pins[idx] = pin
 	}
-
-	r := &Relay{activeHigh, pins, switchMap}
-	return r, nil
+	r.pins = pins
+	r.SwitchMap = switchMap
+	return nil
 }
 
 func (r *Relay) Toggle(swtch int) error {
