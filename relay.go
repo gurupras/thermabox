@@ -52,18 +52,21 @@ func (r *Relay) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 }
 
 func NewRelay(activeHigh bool, gpioPins []int) (*Relay, error) {
-	if err := rpio.Open(); err != nil {
-		return nil, fmt.Errorf("Failed to call rpio.Open(): %v", err)
-	}
 	r := &Relay{}
 	r.activeHigh = activeHigh
-	r.buildSwitchMap(gpioPins)
+	if err := r.buildSwitchMap(gpioPins); err != nil {
+		return nil, err
+	}
 	return r, nil
 }
 
 func (r *Relay) buildSwitchMap(gpioPins []int) error {
 	pins := make([]rpio.Pin, len(gpioPins))
 	switchMap := make(map[int]uint8)
+
+	if err := rpio.Open(); err != nil {
+		return fmt.Errorf("Failed to call rpio.Open(): %v", err)
+	}
 
 	for idx, gpioPin := range gpioPins {
 		pin := rpio.Pin(gpioPin)
