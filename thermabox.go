@@ -15,8 +15,38 @@ type TemperatureSensorInterface interface {
 }
 
 type Element struct {
-	RelayInterface `yaml:"relay"`
-	ToggleDelay    time.Duration `yaml:"toggle_delay_sec"`
+	relay       RelayInterface `yaml:"relay"`
+	ToggleDelay time.Duration  `yaml:"toggle_delay_sec"`
+	lastOn      time.Time
+}
+
+func (e *Element) On() error {
+	if e.ToggleDelay > 0 {
+		now := time.Now()
+		sinceLastOn := now.Sub(e.lastOn)
+		sleepDuration := e.ToggleDelay.Nanoseconds() - sinceLastOn.Nanoseconds()
+		if sleepDuration > 0 {
+			time.Sleep(time.Duration(sleepDuration))
+		}
+	}
+	return e.relay.On(0)
+}
+
+func (e *Element) Off() error {
+	e.lastOn = time.Now()
+	return e.relay.Off(0)
+}
+
+func (e *Element) Toggle() error {
+	if isOn, err := e.relay.IsOn(0); err != nil {
+		if isOn {
+			return e.Off()
+		} else {
+			return e.On()
+		}
+	} else {
+		return err
+	}
 }
 
 func (e *Element) UnmarshalYAML(unmarshal func(i interface{}) error) error {
@@ -29,10 +59,10 @@ func (e *Element) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 		b, _ := yaml.Marshal(m["relay"])
 		return yaml.Unmarshal(b, i)
 	}
-	if e.RelayInterface == nil {
-		e.RelayInterface = &Relay{}
+	if e.relay == nil {
+		e.relay = &Relay{}
 	}
-	if err := e.RelayInterface.UnmarshalYAML(relayUnmarshaler); err != nil {
+	if err := e.relay.UnmarshalYAML(relayUnmarshaler); err != nil {
 		return err
 	}
 	if _, ok := m["toggle_delay_sec"]; !ok {
@@ -127,4 +157,36 @@ func (t *Thermabox) SetLimits(temperature float64, threshold float64) {
 
 func (t *Thermabox) GetLimits() (float64, float64) {
 	return t.temperature, t.threshold
+}
+
+func (t *Thermabox) SetProbe(probe TemperatureSensorInterface) {
+	t.probe = probe
+}
+
+func (t *Thermabox) Run() error {
+	for {
+		temp, err := t.GetTemperature()
+		if err != nil {
+			log.Errorf("Failed to get temperature: %v", err)
+		}
+		if temp <= t.temperature-t.threshold {
+			// Temperature has dropped below threshold
+			// Start heating element to warm it back up
+			if err := t.coolingElement.Off(); err != nil {
+				log.Errorf("Failed to turn off cooling element: %v", err)
+			}
+			if err := t.heatingElement.On(); err != nil {
+				log.Errorf("Failed to turn on heating element: %v", err)
+			}
+		} else if temp >= t.temperature+t.threshold {
+			if err := t.heatingElement.Off(); err != nil {
+				log.Errorf("Failed to turn off heating element: %v", err)
+			}
+			if err := t.coolingElement.On(); err != nil {
+				log.Errorf("Failed to turn on heating element: %v", err)
+			}
+		} else {
+			time.Sleep(100 * time.Second)
+		}
+	}
 }

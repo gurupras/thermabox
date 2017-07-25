@@ -18,14 +18,14 @@ relay:
 toggle_delay_sec: 30
 `
 	element := &Element{}
-	element.RelayInterface = &FakeRelay{}
+	element.relay = &FakeRelay{}
 
 	err := yaml.Unmarshal([]byte(str), element)
 	require.Nil(err)
 
-	require.Equal(false, element.RelayInterface.ActiveHigh())
+	require.Equal(false, element.relay.ActiveHigh())
 
-	sMap := element.RelayInterface.GetSwitchMap()
+	sMap := element.relay.GetSwitchMap()
 	require.NotNil(sMap)
 	require.Equal(1, len(sMap))
 	require.NotNil(sMap[22])
@@ -52,9 +52,9 @@ webserver:
 `
 
 	h := &Element{}
-	h.RelayInterface = &FakeRelay{}
+	h.relay = &FakeRelay{}
 	c := &Element{}
-	c.RelayInterface = &FakeRelay{}
+	c.relay = &FakeRelay{}
 
 	tbox := &Thermabox{}
 	tbox.heatingElement = h
@@ -64,10 +64,10 @@ webserver:
 	require.Nil(err)
 
 	expectedHeating := &Element{
-		genFakeRelay(false, []int{22}), 0,
+		genFakeRelay(false, []int{22}), 0, time.Time{},
 	}
 	expectedCooling := &Element{
-		genFakeRelay(false, []int{23}), 30 * time.Second,
+		genFakeRelay(false, []int{23}), 30 * time.Second, time.Time{},
 	}
 	require.Equal(expectedHeating, tbox.heatingElement)
 	require.Equal(expectedCooling, tbox.coolingElement)
