@@ -14,12 +14,16 @@ import (
 )
 
 var (
-	app  = kingpin.New("ThermaBox", "Temperature-controller")
-	conf = app.Arg("conf", "Configuration file (YAML)").Required().String()
+	app     = kingpin.New("ThermaBox", "Temperature-controller")
+	conf    = app.Arg("conf", "Configuration file (YAML)").Required().String()
+	verbose = app.Flag("verbose", "Verbose logging").Short('v').Default("false").Bool()
 )
 
 func main() {
 	kingpin.MustParse(app.Parse(os.Args[1:]))
+	if *verbose {
+		log.SetLevel(log.DebugLevel)
+	}
 
 	if !easyfiles.Exists(*conf) {
 		log.Fatalf("Configuration file '%v' does not exist")
