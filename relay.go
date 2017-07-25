@@ -5,6 +5,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stianeikeland/go-rpio"
 )
 
@@ -38,6 +39,7 @@ func (r *Relay) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	if err != nil {
 		return err
 	}
+	log.Debugf("Relay unmarshalling: %v", m)
 	activeHigh := m["active_high"].(bool)
 	pinsInterface := m["pins"].([]interface{})
 	pins := make([]int, len(pinsInterface))
