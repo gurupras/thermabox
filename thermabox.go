@@ -23,6 +23,14 @@ type TemperatureSensorInterface interface {
 	Temperature() (float64, error)
 }
 
+type ElementToggleDelayError struct {
+	msg string
+}
+
+func (e ElementToggleDelayError) Error() string {
+	return e.msg
+}
+
 type Element struct {
 	relay       RelayInterface `yaml:"relay"`
 	ToggleDelay time.Duration  `yaml:"toggle_delay_sec"`
@@ -35,7 +43,7 @@ func (e *Element) On() error {
 		sinceLastOn := now.Sub(e.lastOn)
 		sleepDuration := e.ToggleDelay.Nanoseconds() - sinceLastOn.Nanoseconds()
 		if sleepDuration > 0 {
-			time.Sleep(time.Duration(sleepDuration))
+			return ElementToggleDelayError{"Minimum delay not elapsed"}
 		}
 	}
 	return e.relay.On(1)
@@ -190,7 +198,11 @@ func (t *Thermabox) Run() error {
 				log.Errorf("Failed to turn off cooling element: %v", err)
 			}
 			if err := t.heatingElement.On(); err != nil {
-				log.Errorf("Failed to turn on heating element: %v", err)
+				if _, ok := err.(ElementToggleDelayError); !ok {
+					log.Errorf("Failed to turn on heating element: %v", err)
+				} else {
+					// This was just a regular toggle delay error..just continue
+				}
 			}
 		} else if temp >= t.temperature+t.threshold {
 			curState = COOLING_DOWN
@@ -198,7 +210,11 @@ func (t *Thermabox) Run() error {
 				log.Errorf("Failed to turn off heating element: %v", err)
 			}
 			if err := t.coolingElement.On(); err != nil {
-				log.Errorf("Failed to turn on heating element: %v", err)
+				if _, ok := err.(ElementToggleDelayError); !ok {
+					log.Errorf("Failed to turn on cooling element: %v", err)
+				} else {
+					// This was just a regular toggle delay error..just continue
+				}
 			}
 		} else if temp > t.temperature-t.threshold && temp < t.temperature+t.threshold {
 			curState = STABLE
