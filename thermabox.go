@@ -173,14 +173,14 @@ func (t *Thermabox) SetProbe(probe TemperatureSensorInterface) {
 }
 
 func (t *Thermabox) Run() error {
+	lastState := UNKNOWN
+	curState := UNKNOWN
+
 	for {
 		temp, err := t.GetTemperature()
 		if err != nil {
 			log.Errorf("Failed to get temperature: %v", err)
 		}
-
-		lastState := UNKNOWN
-		curState := UNKNOWN
 
 		if temp <= t.temperature-t.threshold {
 			// Temperature has dropped below threshold
