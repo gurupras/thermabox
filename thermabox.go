@@ -29,16 +29,16 @@ func (e *Element) On() error {
 			time.Sleep(time.Duration(sleepDuration))
 		}
 	}
-	return e.relay.On(0)
+	return e.relay.On(1)
 }
 
 func (e *Element) Off() error {
 	e.lastOn = time.Now()
-	return e.relay.Off(0)
+	return e.relay.Off(1)
 }
 
 func (e *Element) Toggle() error {
-	if isOn, err := e.relay.IsOn(0); err != nil {
+	if isOn, err := e.relay.IsOn(1); err != nil {
 		if isOn {
 			return e.Off()
 		} else {
