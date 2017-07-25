@@ -11,7 +11,7 @@ import (
 )
 
 type TemperatureSensorInterface interface {
-	Temperature() float64
+	Temperature() (float64, error)
 }
 
 type Element struct {
@@ -116,7 +116,7 @@ func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	return nil
 }
 
-func (t *Thermabox) GetTemperature() float64 {
+func (t *Thermabox) GetTemperature() (float64, error) {
 	return t.probe.Temperature()
 }
 
