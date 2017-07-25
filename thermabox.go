@@ -213,6 +213,7 @@ func (t *Thermabox) Run() error {
 			log.Infof("temp=%.2f target=%.2f threshold=%.2f -> %v", temp, t.temperature, t.threshold, curState)
 			lastState = curState
 		}
-		time.Sleep(100 * time.Millisecond)
+		log.Debugf("temp=%v", temp)
+		time.Sleep(300 * time.Millisecond)
 	}
 }
