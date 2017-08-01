@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	yaml "gopkg.in/yaml.v2"
+
 	"github.com/googollee/go-socket.io"
 	"github.com/gorilla/mux"
 	"github.com/gurupras/go-stoppable-net-listener"
@@ -17,8 +19,35 @@ import (
 
 type Webserver struct {
 	Port int    `yaml:"port"`
-	path string `yaml:"path"`
+	Path string `yaml:"path"`
 	snl  *stoppablenetlistener.StoppableNetListener
+}
+
+// Expects configuration to be under 'webserver'
+func (w *Webserver) UnmarshalYAML(unmarshal func(i interface{}) error) error {
+	m := make(map[string]interface{})
+	if err := unmarshal(&m); err != nil {
+		return err
+	}
+	var b []byte
+	var err error
+	data, ok := m["webserver"]
+	if !ok {
+		log.Debugf("No key 'webserver' found while unmarshalling Webserver")
+		goto unmarshal
+	}
+	b, err = yaml.Marshal(data)
+	if err != nil {
+		return err
+	}
+	m = make(map[string]interface{})
+	if err := yaml.Unmarshal(b, &m); err != nil {
+		return err
+	}
+unmarshal:
+	w.Port = m["port"].(int)
+	w.Path = m["path"].(string)
+	return nil
 }
 
 func (w *Webserver) Stop() {
@@ -27,7 +56,7 @@ func (w *Webserver) Stop() {
 	}
 }
 func (w *Webserver) Start(tbox ThermaboxInterface) {
-	handler, err := InitializeWebServer(w.path, "/", tbox, nil)
+	handler, err := InitializeWebServer(w.Path, "/", tbox, nil)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}

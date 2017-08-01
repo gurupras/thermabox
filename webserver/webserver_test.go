@@ -7,13 +7,61 @@ import (
 	"testing"
 	"time"
 
+	yaml "gopkg.in/yaml.v2"
+
 	"github.com/gurupras/go-stoppable-net-listener"
 	"github.com/homesound/golang-socketio"
 	"github.com/homesound/golang-socketio/transport"
 	"github.com/parnurzeal/gorequest"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestYAMLUnmarshal(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	conf := `
+webserver:
+  port: 8080
+  path: ./..
+`
+	w := Webserver{}
+	err := yaml.Unmarshal([]byte(conf), &w)
+	require.Nil(err)
+
+	assert.Equal(8080, w.Port)
+	assert.Equal("./..", w.path)
+
+	conf = `
+port: 8080
+path: ./..
+`
+	w = Webserver{}
+	err = yaml.Unmarshal([]byte(conf), &w)
+	require.Nil(err)
+
+	assert.Equal(8080, w.Port)
+	assert.Equal("./..", w.path)
+
+	// Now test with some extra stuff
+	conf = `
+random:
+  a: 1
+  b: 2
+webserver:
+  port: 8080
+  path: ./..
+`
+	w = Webserver{}
+	err = yaml.Unmarshal([]byte(conf), &w)
+	require.Nil(err)
+
+	assert.Equal(8080, w.Port)
+	assert.Equal("./..", w.path)
+
+}
 
 func TestWebServer(t *testing.T) {
 	require := require.New(t)
