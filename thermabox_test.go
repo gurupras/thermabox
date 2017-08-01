@@ -6,6 +6,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,6 +51,8 @@ threshold: 0.5
 webserver:
   port: 8080
 `
+
+	log.SetLevel(log.DebugLevel)
 
 	h := &Element{}
 	h.relay = &FakeRelay{}

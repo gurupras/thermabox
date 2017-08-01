@@ -14,6 +14,7 @@ import (
 	"github.com/googollee/go-socket.io"
 	"github.com/gorilla/mux"
 	"github.com/gurupras/go-stoppable-net-listener"
+	thermabox_interfaces "github.com/gurupras/thermabox/interfaces"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -45,8 +46,17 @@ func (w *Webserver) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 		return err
 	}
 unmarshal:
-	w.Port = m["port"].(int)
-	w.Path = m["path"].(string)
+	if port, ok := m["port"]; ok {
+		w.Port = port.(int)
+	} else {
+		w.Port = 80
+	}
+
+	if path, ok := m["path"]; ok {
+		w.Path = path.(string)
+	} else {
+		w.Path = "."
+	}
 	return nil
 }
 
@@ -55,7 +65,7 @@ func (w *Webserver) Stop() {
 		w.snl.Stop()
 	}
 }
-func (w *Webserver) Start(tbox ThermaboxInterface) {
+func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 	handler, err := InitializeWebServer(w.Path, "/", tbox, nil)
 	if err != nil {
 		log.Fatalf("%v", err)
@@ -72,12 +82,6 @@ func (w *Webserver) Start(tbox ThermaboxInterface) {
 	server.Serve(snl)
 }
 
-type ThermaboxInterface interface {
-	GetTemperature() float64
-	SetLimits(temperature float64, threshold float64)
-	GetLimits() (temperature float64, threshold float64)
-}
-
 func IndexHandler(path string, w http.ResponseWriter, req *http.Request) error {
 	indexFile := filepath.Join(path, "static", "html", "index.html")
 	f, err := os.Open(indexFile)
@@ -89,13 +93,17 @@ func IndexHandler(path string, w http.ResponseWriter, req *http.Request) error {
 	return err
 }
 
-func GetTemperatureHandler(tbox ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+func GetTemperatureHandler(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
 	w.WriteHeader(200)
-	w.Write([]byte(fmt.Sprintf("%v", tbox.GetTemperature())))
+	temp, err := tbox.GetTemperature()
+	if err != nil {
+		return err
+	}
+	w.Write([]byte(fmt.Sprintf("%v", temp)))
 	return nil
 }
 
-func GetTemperatureLimits(tbox ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+func GetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
 	w.WriteHeader(200)
 	temp, threshold := tbox.GetLimits()
 	m := make(map[string]interface{})
@@ -106,7 +114,7 @@ func GetTemperatureLimits(tbox ThermaboxInterface, w http.ResponseWriter, req *h
 	return nil
 }
 
-func SetTemperatureLimits(tbox ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+func SetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
 	w.WriteHeader(200)
 	temp, err := strconv.ParseFloat(req.FormValue("temperature"), 64)
 	if err != nil {
@@ -120,7 +128,7 @@ func SetTemperatureLimits(tbox ThermaboxInterface, w http.ResponseWriter, req *h
 	return nil
 }
 
-func InitializeWebServer(path string, webserverBasePath string, tbox ThermaboxInterface, io *socketio.Server) (http.Handler, error) {
+func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_interfaces.ThermaboxInterface, io *socketio.Server) (http.Handler, error) {
 	if io == nil {
 		var err error
 		if io, err = socketio.NewServer(nil); err != nil {
@@ -152,7 +160,11 @@ func InitializeWebServer(path string, webserverBasePath string, tbox ThermaboxIn
 	})
 
 	io.OnEvent("/", "get-temperature", func(s socketio.Conn) {
-		temp := tbox.GetTemperature()
+		temp, err := tbox.GetTemperature()
+		if err != nil {
+			log.Errorf("Failed to get temperature: %v", err)
+			return
+		}
 		m := make(map[string]interface{})
 		m["temp"] = temp
 		log.Debugf("socket.io [get-temperature]: Sending back temp: %v", temp)

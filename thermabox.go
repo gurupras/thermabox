@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gurupras/thermabox/interfaces"
 	"github.com/gurupras/thermabox/webserver"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -18,10 +19,6 @@ const (
 	STABLE       string = "stable"
 	UNKNOWN      string = "unknown"
 )
-
-type TemperatureSensorInterface interface {
-	Temperature() (float64, error)
-}
 
 type ElementToggleDelayError struct {
 	msg string
@@ -95,7 +92,7 @@ type Thermabox struct {
 	coolingElement       *Element `yaml:"cooling_element"`
 	temperature          float64  `yaml:"temperature"`
 	threshold            float64  `yaml:"threshold"`
-	probe                TemperatureSensorInterface
+	probe                interfaces.TemperatureSensorInterface
 	*webserver.Webserver `yaml:"webserver"`
 }
 
@@ -164,7 +161,7 @@ func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 }
 
 func (t *Thermabox) GetTemperature() (float64, error) {
-	return t.probe.Temperature()
+	return t.probe.GetTemperature()
 }
 
 func (t *Thermabox) SetLimits(temperature float64, threshold float64) {
@@ -176,14 +173,18 @@ func (t *Thermabox) GetLimits() (float64, float64) {
 	return t.temperature, t.threshold
 }
 
-func (t *Thermabox) SetProbe(probe TemperatureSensorInterface) {
+func (t *Thermabox) SetProbe(probe interfaces.TemperatureSensorInterface) {
 	t.probe = probe
 }
 
 func (t *Thermabox) Run() error {
+	if t.Webserver != nil {
+		go t.Webserver.Start(t)
+		defer t.Webserver.Stop()
+	}
+
 	lastState := UNKNOWN
 	curState := UNKNOWN
-
 	for {
 		temp, err := t.GetTemperature()
 		if err != nil {
