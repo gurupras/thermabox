@@ -189,6 +189,11 @@ func (t *Thermabox) Run() error {
 		temp, err := t.GetTemperature()
 		if err != nil {
 			log.Errorf("Failed to get temperature: %v", err)
+			// Turn off all elements and exit
+			t.heatingElement.Off()
+			t.coolingElement.Off()
+			log.Fatalf("Shutting down!")
+			break
 		}
 
 		if temp <= t.temperature-t.threshold {
@@ -233,4 +238,5 @@ func (t *Thermabox) Run() error {
 		log.Debugf("temp=%v", temp)
 		time.Sleep(300 * time.Millisecond)
 	}
+	return nil
 }
