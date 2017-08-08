@@ -20,8 +20,8 @@ type DummyThermaBoxInterface struct {
 	threshold   float64
 }
 
-func (d *DummyThermaBoxInterface) GetTemperature() float64 {
-	return 100.00
+func (d *DummyThermaBoxInterface) GetTemperature() (float64, error) {
+	return 100.00, nil
 }
 func (d *DummyThermaBoxInterface) GetLimits() (float64, float64) {
 	log.Debugf("get-temperature: Returning: %v +/- %v", d.temperature, d.threshold)
