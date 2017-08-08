@@ -74,13 +74,15 @@ func (r *Relay) buildSwitchMap(gpioPins []int) error {
 		switchMap[idx+1] = uint8(pin)
 		// Set pin to output mode
 		pin.Output()
-		// Turn it off
-		switch r.activeHigh {
-		case true:
-			pin.Low()
-		case false:
-			pin.High()
-		}
+		/*
+			// Turn it off
+			switch r.activeHigh {
+			case true:
+				pin.Low()
+			case false:
+				pin.High()
+			}
+		*/
 		pins[idx] = pin
 	}
 	r.pins = pins
