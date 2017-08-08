@@ -32,7 +32,7 @@ webserver:
 	require.Nil(err)
 
 	assert.Equal(8080, w.Port)
-	assert.Equal("./..", w.path)
+	assert.Equal("./..", w.Path)
 
 	conf = `
 port: 8080
@@ -43,7 +43,7 @@ path: ./..
 	require.Nil(err)
 
 	assert.Equal(8080, w.Port)
-	assert.Equal("./..", w.path)
+	assert.Equal("./..", w.Path)
 
 	// Now test with some extra stuff
 	conf = `
@@ -59,7 +59,7 @@ webserver:
 	require.Nil(err)
 
 	assert.Equal(8080, w.Port)
-	assert.Equal("./..", w.path)
+	assert.Equal("./..", w.Path)
 
 }
 
@@ -92,15 +92,27 @@ func TestWebServer(t *testing.T) {
 	snl.Stop()
 }
 
-type DummyThermaBoxInterface struct{}
+type DummyThermaboxInterface struct {
+	temperature float64
+	threshold   float64
+}
 
-func (d DummyThermaBoxInterface) GetTemperature() float64 {
-	return 114.14
+func NewDummyThermaboxInterface() *DummyThermaboxInterface {
+	d := DummyThermaboxInterface{}
+	d.temperature = 114.14
+	d.threshold = 0.2
+	return &d
 }
-func (d DummyThermaBoxInterface) GetLimits() (temp float64, threshold float64) {
-	return 114.14, 0.2
+
+func (d *DummyThermaboxInterface) GetTemperature() (float64, error) {
+	return d.temperature, nil
 }
-func (d DummyThermaBoxInterface) SetLimits(temp float64, threshold float64) {
+func (d *DummyThermaboxInterface) GetLimits() (temp float64, threshold float64) {
+	return d.temperature, d.threshold
+}
+func (d *DummyThermaboxInterface) SetLimits(temp float64, threshold float64) {
+	d.temperature = temp
+	d.threshold = threshold
 }
 
 // FIXME: Socket.io client code is broken. Cannot run more than 1 request at the moment
@@ -111,7 +123,7 @@ func TestSocketIo(t *testing.T) {
 	//io, err := socketio.NewServer(nil)
 	//require.Nil(err)
 
-	handler, err := InitializeWebServer(".", "/", DummyThermaBoxInterface{}, nil)
+	handler, err := InitializeWebServer(".", "/", NewDummyThermaboxInterface(), nil)
 	require.Nil(err)
 	require.NotNil(handler)
 
@@ -198,5 +210,59 @@ func TestSubWebServer(t *testing.T) {
 	log.Debugf("errs: \n%v\n", errs)
 	log.Debugf("body: \n%v\n", body)
 	require.Equal(200, resp.StatusCode)
+	snl.Stop()
+}
+
+func TestPOSTSetLimits(t *testing.T) {
+	require := require.New(t)
+
+	tbox := NewDummyThermaboxInterface()
+	handler, err := InitializeWebServer(".", "/", tbox, nil)
+	require.Nil(err)
+	require.NotNil(handler)
+
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	server := http.Server{}
+	server.Handler = mux
+	snl, err := stoppablenetlistener.New(31123)
+	require.Nil(err)
+	require.NotNil(snl)
+	go func() {
+		server.Serve(snl)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	data := make(map[string]interface{})
+	data["temperature"] = 14.4
+	data["threshold"] = 2.5
+
+	b, err := json.Marshal(data)
+	require.Nil(err)
+
+	agent := gorequest.New()
+	resp, errs, body := agent.Post("http://localhost:31123/set-limits").Type("form").Send(string(b)).EndBytes()
+	_ = errs
+	_ = body
+	log.Debugf("resp: \n%v\n", resp)
+	log.Debugf("errs: \n%v\n", errs)
+	log.Debugf("body: \n%v\n", body)
+	require.Equal(200, resp.StatusCode)
+
+	// Now get the limits via get-limits
+	resp, errs, body = gorequest.New().Get("http://localhost:31123/get-limits").EndBytes()
+	require.Equal(200, resp.StatusCode)
+
+	m := make(map[string]interface{})
+	err = json.Unmarshal(b, &m)
+	require.Nil(err)
+	require.Equal(data["temperature"], m["temperature"])
+	require.Equal(data["threshold"], m["threshold"])
+
+	// Also verify that they match in the dummy object
+	temp, threshold := tbox.GetLimits()
+	require.Equal(data["temperature"], temp)
+	require.Equal(data["threshold"], threshold)
 	snl.Stop()
 }
