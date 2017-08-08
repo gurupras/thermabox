@@ -62,7 +62,9 @@ unmarshal:
 
 func (w *Webserver) Stop() {
 	if w.snl != nil {
+		log.Info("Stopping webserver on port: %v", w.Port)
 		w.snl.Stop()
+		w.snl = nil
 	}
 }
 func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
@@ -79,6 +81,7 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 		log.Fatalf("%v", err)
 	}
 	w.snl = snl
+	log.Info("Starting webserver on port: %v", w.Port)
 	server.Serve(snl)
 }
 
@@ -155,7 +158,7 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 		threshold := m["threshold"].(float64)
 		tbox.SetLimits(temp, threshold)
 		log.Infof("socket.io [set-limits]: Set limits to %v (+/- %v)", temp, threshold)
-		s.Emit("set-limits", "haha")
+		s.Emit("set-limits", "OK")
 		s.Close()
 	})
 
