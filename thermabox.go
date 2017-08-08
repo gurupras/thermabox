@@ -2,6 +2,7 @@ package thermabox
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -92,6 +93,7 @@ type Thermabox struct {
 	coolingElement       *Element `yaml:"cooling_element"`
 	temperature          float64  `yaml:"temperature"`
 	threshold            float64  `yaml:"threshold"`
+	cutoffAtThreshold    bool     `yaml:"cutoff_at_threshold"`
 	probe                interfaces.TemperatureSensorInterface
 	*webserver.Webserver `yaml:"webserver"`
 }
@@ -135,6 +137,13 @@ func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	if err != nil {
 		return fmt.Errorf("Failed while parsing threshold: %v", err)
 	}
+	if _, ok := m["cutoff_at_threshold"]; !ok {
+		m["cutoff_at_threshold"] = false
+	}
+	cutoffAtThreshold, ok := m["cutoff_at_threshold"].(bool)
+	if !ok {
+		return fmt.Errorf("Failed while parsing cutoff_at_threshold: %t", m["cutoff_at_threshold"])
+	}
 
 	if t.heatingElement == nil {
 		t.heatingElement = &Element{}
@@ -157,6 +166,7 @@ func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	}
 	t.temperature = temperature
 	t.threshold = threshold
+	t.cutoffAtThreshold = cutoffAtThreshold
 	return nil
 }
 
@@ -185,6 +195,17 @@ func (t *Thermabox) Run() error {
 
 	lastState := UNKNOWN
 	curState := UNKNOWN
+	var (
+		upperLimit float64
+		lowerLimit float64
+	)
+	if t.cutoffAtThreshold {
+		lowerLimit = t.temperature - t.threshold
+		upperLimit = t.temperature + t.threshold
+	} else {
+
+	}
+
 	for {
 		temp, err := t.GetTemperature()
 		if err != nil {
@@ -196,7 +217,10 @@ func (t *Thermabox) Run() error {
 			break
 		}
 
-		if temp <= t.temperature-t.threshold {
+		if !t.cutoffAtThreshold {
+			// Use integer values
+		}
+		if temp < lowerLimit {
 			// Temperature has dropped below threshold
 			// Start heating element to warm it back up
 			curState = HEATING_UP
@@ -210,7 +234,7 @@ func (t *Thermabox) Run() error {
 					// This was just a regular toggle delay error..just continue
 				}
 			}
-		} else if temp >= t.temperature+t.threshold {
+		} else if temp > upperLimit {
 			curState = COOLING_DOWN
 			if err := t.heatingElement.Off(); err != nil {
 				log.Errorf("Failed to turn off heating element: %v", err)
@@ -222,13 +246,29 @@ func (t *Thermabox) Run() error {
 					// This was just a regular toggle delay error..just continue
 				}
 			}
-		} else if temp > t.temperature-t.threshold && temp < t.temperature+t.threshold {
-			curState = STABLE
-			if err := t.heatingElement.Off(); err != nil {
-				log.Errorf("Failed to turn off heating element: %v", err)
+		} else {
+			// Check if stable
+			// We now have 2 cases to deal with
+			cutoff := false
+			if t.cutoffAtThreshold {
+				if temp >= lowerLimit && temp <= upperLimit {
+					cutoff = true
+				}
+			} else if !t.cutoffAtThreshold {
+				// We only deal with 1 decimal point of precision
+				if toFixed(temp, 1) == toFixed(t.temperature, 1) {
+					cutoff = true
+				}
 			}
-			if err := t.coolingElement.Off(); err != nil {
-				log.Errorf("Failed to turn off heating element: %v", err)
+			// Common cutoff logic
+			if cutoff {
+				curState = STABLE
+				if err := t.heatingElement.Off(); err != nil {
+					log.Errorf("Failed to turn off heating element: %v", err)
+				}
+				if err := t.coolingElement.Off(); err != nil {
+					log.Errorf("Failed to turn off heating element: %v", err)
+				}
 			}
 		}
 		if lastState != curState {
@@ -239,4 +279,13 @@ func (t *Thermabox) Run() error {
 		time.Sleep(300 * time.Millisecond)
 	}
 	return nil
+}
+
+func toFixed(num float64, precision int) float64 {
+	round := func(num float64) int {
+		return int(num + math.Copysign(0.5, num))
+	}
+
+	output := math.Pow(10, float64(precision))
+	return float64(round(num*output)) / output
 }
