@@ -217,9 +217,6 @@ func (t *Thermabox) Run() error {
 			break
 		}
 
-		if !t.cutoffAtThreshold {
-			// Use integer values
-		}
 		if temp < lowerLimit {
 			// Temperature has dropped below threshold
 			// Start heating element to warm it back up
