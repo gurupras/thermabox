@@ -199,12 +199,8 @@ func (t *Thermabox) Run() error {
 		upperLimit float64
 		lowerLimit float64
 	)
-	if t.cutoffAtThreshold {
-		lowerLimit = t.temperature - t.threshold
-		upperLimit = t.temperature + t.threshold
-	} else {
-
-	}
+	lowerLimit = t.temperature - t.threshold
+	upperLimit = t.temperature + t.threshold
 
 	for {
 		temp, err := t.GetTemperature()
@@ -217,31 +213,35 @@ func (t *Thermabox) Run() error {
 			break
 		}
 
-		if temp < lowerLimit {
-			// Temperature has dropped below threshold
-			// Start heating element to warm it back up
-			curState = HEATING_UP
-			if err := t.coolingElement.Off(); err != nil {
-				log.Errorf("Failed to turn off cooling element: %v", err)
-			}
-			if err := t.heatingElement.On(); err != nil {
-				if _, ok := err.(ElementToggleDelayError); !ok {
-					log.Errorf("Failed to turn on heating element: %v", err)
-				} else {
-					// This was just a regular toggle delay error..just continue
+		if curState == STABLE || curState == UNKNOWN {
+			if temp < lowerLimit {
+				// Temperature has dropped below threshold
+				// Start heating element to warm it back up
+				curState = HEATING_UP
+				if err := t.coolingElement.Off(); err != nil {
+					log.Errorf("Failed to turn off cooling element: %v", err)
 				}
-			}
-		} else if temp > upperLimit {
-			curState = COOLING_DOWN
-			if err := t.heatingElement.Off(); err != nil {
-				log.Errorf("Failed to turn off heating element: %v", err)
-			}
-			if err := t.coolingElement.On(); err != nil {
-				if _, ok := err.(ElementToggleDelayError); !ok {
-					log.Errorf("Failed to turn on cooling element: %v", err)
-				} else {
-					// This was just a regular toggle delay error..just continue
+				if err := t.heatingElement.On(); err != nil {
+					if _, ok := err.(ElementToggleDelayError); !ok {
+						log.Errorf("Failed to turn on heating element: %v", err)
+					} else {
+						// This was just a regular toggle delay error..just continue
+					}
 				}
+			} else if temp > upperLimit {
+				curState = COOLING_DOWN
+				if err := t.heatingElement.Off(); err != nil {
+					log.Errorf("Failed to turn off heating element: %v", err)
+				}
+				if err := t.coolingElement.On(); err != nil {
+					if _, ok := err.(ElementToggleDelayError); !ok {
+						log.Errorf("Failed to turn on cooling element: %v", err)
+					} else {
+						// This was just a regular toggle delay error..just continue
+					}
+				}
+			} else {
+				curState = STABLE
 			}
 		} else {
 			// Check if stable
@@ -253,8 +253,17 @@ func (t *Thermabox) Run() error {
 				}
 			} else if !t.cutoffAtThreshold {
 				// We only deal with 1 decimal point of precision
-				if toFixed(temp, 1) == toFixed(t.temperature, 1) {
-					cutoff = true
+				val := round(temp, 0.5, 1)
+				expected := round(t.temperature, 0.5, 1)
+				switch curState {
+				case HEATING_UP:
+					if val >= expected {
+						cutoff = true
+					}
+				case COOLING_DOWN:
+					if val <= expected {
+						cutoff = true
+					}
 				}
 			}
 			// Common cutoff logic
@@ -278,11 +287,17 @@ func (t *Thermabox) Run() error {
 	return nil
 }
 
-func toFixed(num float64, precision int) float64 {
-	round := func(num float64) int {
-		return int(num + math.Copysign(0.5, num))
+// Borrowed from https://gist.github.com/DavidVaini/10308388
+func round(val float64, roundOn float64, places int) (newVal float64) {
+	var round float64
+	pow := math.Pow(10, float64(places))
+	digit := pow * val
+	_, div := math.Modf(digit)
+	if div >= roundOn {
+		round = math.Ceil(digit)
+	} else {
+		round = math.Floor(digit)
 	}
-
-	output := math.Pow(10, float64(precision))
-	return float64(round(num*output)) / output
+	newVal = round / pow
+	return
 }
