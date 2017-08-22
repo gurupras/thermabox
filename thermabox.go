@@ -264,6 +264,10 @@ func (t *Thermabox) Run() error {
 					if val <= expected {
 						cutoff = true
 					}
+				case UNKNOWN:
+					if val >= lowerLimit && val <= upperLimit {
+						cutoff = true
+					}
 				}
 			}
 			// Common cutoff logic
