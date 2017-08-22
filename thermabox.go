@@ -272,6 +272,7 @@ func (t *Thermabox) Run() error {
 			}
 			// Common cutoff logic
 			if cutoff {
+				log.Debugf("Attempting to turn off heating/cooling elements")
 				curState = STABLE
 				if err := t.heatingElement.Off(); err != nil {
 					log.Errorf("Failed to turn off heating element: %v", err)
