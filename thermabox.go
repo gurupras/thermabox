@@ -287,7 +287,7 @@ func (t *Thermabox) Run() error {
 			lastState = curState
 		}
 		log.Debugf("temp=%v", temp)
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 	return nil
 }
