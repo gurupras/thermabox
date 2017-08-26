@@ -10,13 +10,15 @@ import (
 	temperusb "github.com/gurupras/go-TEMPerUSB"
 	easyfiles "github.com/gurupras/go-easyfiles"
 	"github.com/gurupras/thermabox"
+	"github.com/gurupras/thermabox/interfaces"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	app     = kingpin.New("ThermaBox", "Temperature-controller")
-	conf    = app.Arg("conf", "Configuration file (YAML)").Required().String()
-	verbose = app.Flag("verbose", "Verbose logging").Short('v').Default("false").Bool()
+	app          = kingpin.New("ThermaBox", "Temperature-controller")
+	conf         = app.Arg("conf", "Configuration file (YAML)").Required().String()
+	verbose      = app.Flag("verbose", "Verbose logging").Short('v').Default("false").Bool()
+	sensorSource = app.Flag("sensor", "Temperature sensor source").Short('S').Default("usb").String()
 )
 
 func main() {
@@ -40,9 +42,18 @@ func main() {
 	}
 
 	// Get a hold of the temperature sensor
-	sensor, err := temperusb.New()
-	if err != nil {
-		log.Fatalf("Failed to acquire temperature sensor: %v", err)
+	var sensor interfaces.TemperatureSensorInterface
+	switch *sensorSource {
+	case "usb":
+		fallthrough
+	case "USB":
+		sensor, err = temperusb.New()
+		if err != nil {
+			log.Fatalf("Failed to acquire temperature sensor: %v", err)
+		}
+	default:
+		// Assumes HTTP
+		sensor = &thermabox.HTTPProbe{*sensorSource}
 	}
 	tbox.SetProbe(sensor)
 
