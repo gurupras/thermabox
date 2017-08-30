@@ -19,7 +19,7 @@ func (p *HTTPProbe) GetTemperature() (float64, error) {
 		var bodyStr string
 		var temp float64
 		var _err error
-		resp, body, errs := gorequest.New().Get(p.Url).End()
+		resp, body, errs := gorequest.New().Timeout(1 * time.Second).Get(p.Url).End()
 		if len(errs) > 0 {
 			err = fmt.Errorf("Failed to get temperature: %v", errs)
 			goto retry
