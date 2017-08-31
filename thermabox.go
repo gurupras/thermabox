@@ -209,7 +209,7 @@ func (t *Thermabox) Run() error {
 			// Turn off all elements and exit
 			t.heatingElement.Off()
 			t.coolingElement.Off()
-			log.Fatalf("Shutting down!")
+			log.Fatalf("Shutting down at time: %v", time.Now())
 			break
 		}
 
