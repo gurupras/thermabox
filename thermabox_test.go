@@ -48,6 +48,7 @@ cooling_element:
   toggle_delay_sec: 30
 temperature: 45
 threshold: 0.5
+cutoff_temperature: 50
 webserver:
   port: 8080
 `
@@ -76,4 +77,5 @@ webserver:
 	require.Equal(expectedCooling, tbox.coolingElement)
 	require.Equal(45.0, tbox.temperature)
 	require.Equal(0.5, tbox.threshold)
+	require.Equal(50.0, tbox.cutoffTemp)
 }

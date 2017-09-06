@@ -94,6 +94,7 @@ type Thermabox struct {
 	temperature          float64  `yaml:"temperature"`
 	threshold            float64  `yaml:"threshold"`
 	cutoffAtThreshold    bool     `yaml:"cutoff_at_threshold"`
+	cutoffTemp           float64  `yaml:"cutoff_temperature"`
 	probe                interfaces.TemperatureSensorInterface
 	state                State
 	*webserver.Webserver `yaml:"webserver"`
@@ -138,6 +139,14 @@ func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	if err != nil {
 		return fmt.Errorf("Failed while parsing threshold: %v", err)
 	}
+	if _, ok := m["cutoff_temperature"]; !ok {
+		m["cutoff_temperature"] = 0.0
+	}
+	cutoffTemp, err := strconv.ParseFloat(fmt.Sprintf("%v", m["cutoff_temperature"]), 64)
+	if err != nil {
+		return fmt.Errorf("Failed while parsing cutoff_temperature: %v", err)
+	}
+
 	if _, ok := m["cutoff_at_threshold"]; !ok {
 		m["cutoff_at_threshold"] = false
 	}
@@ -168,6 +177,7 @@ func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	t.temperature = temperature
 	t.threshold = threshold
 	t.cutoffAtThreshold = cutoffAtThreshold
+	t.cutoffTemp = cutoffTemp
 	return nil
 }
 
@@ -212,6 +222,13 @@ func (t *Thermabox) Run() error {
 		if err != nil {
 			log.Errorf("Failed to get temperature: %v", err)
 			// Turn off all elements and exit
+			t.heatingElement.Off()
+			t.coolingElement.Off()
+			log.Fatalf("Shutting down at time: %v", time.Now())
+			break
+		}
+		if t.cutoffTemp != 0.0 && temp > t.cutoffTemp {
+			log.Errorf("Temperature > cutoff temperature: %v > %v", temp, t.cutoffTemp)
 			t.heatingElement.Off()
 			t.coolingElement.Off()
 			log.Fatalf("Shutting down at time: %v", time.Now())
