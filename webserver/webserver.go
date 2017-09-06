@@ -97,6 +97,7 @@ func IndexHandler(path string, w http.ResponseWriter, req *http.Request) error {
 }
 
 func GetTemperatureHandler(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(200)
 	temp, err := tbox.GetTemperature()
 	if err != nil {
@@ -107,6 +108,7 @@ func GetTemperatureHandler(tbox thermabox_interfaces.ThermaboxInterface, w http.
 }
 
 func GetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(200)
 	temp, threshold := tbox.GetLimits()
 	m := make(map[string]interface{})
@@ -118,6 +120,7 @@ func GetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.R
 }
 
 func SetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(200)
 	temp, err := strconv.ParseFloat(req.FormValue("temperature"), 64)
 	if err != nil {
@@ -132,6 +135,7 @@ func SetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.R
 }
 
 func GetStateHandler(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(200)
 	state := tbox.GetState()
 	w.Write([]byte(state))
