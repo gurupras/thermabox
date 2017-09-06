@@ -204,10 +204,10 @@ func (t *Thermabox) Run() error {
 		upperLimit float64
 		lowerLimit float64
 	)
-	lowerLimit = t.temperature - t.threshold
-	upperLimit = t.temperature + t.threshold
-
 	for {
+		lowerLimit = t.temperature - t.threshold
+		upperLimit = t.temperature + t.threshold
+
 		temp, err := t.GetTemperature()
 		if err != nil {
 			log.Errorf("Failed to get temperature: %v", err)
