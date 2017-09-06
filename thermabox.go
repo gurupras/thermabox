@@ -15,10 +15,10 @@ import (
 type State string
 
 const (
-	HEATING_UP   string = "heating_up"
-	COOLING_DOWN string = "cooling_down"
-	STABLE       string = "stable"
-	UNKNOWN      string = "unknown"
+	HEATING_UP   State = "heating_up"
+	COOLING_DOWN State = "cooling_down"
+	STABLE       State = "stable"
+	UNKNOWN      State = "unknown"
 )
 
 type ElementToggleDelayError struct {
@@ -95,6 +95,7 @@ type Thermabox struct {
 	threshold            float64  `yaml:"threshold"`
 	cutoffAtThreshold    bool     `yaml:"cutoff_at_threshold"`
 	probe                interfaces.TemperatureSensorInterface
+	state                State
 	*webserver.Webserver `yaml:"webserver"`
 }
 
@@ -284,6 +285,7 @@ func (t *Thermabox) Run() error {
 		}
 		if lastState != curState {
 			log.Infof("temp=%.2f target=%.2f threshold=%.2f -> %v", temp, t.temperature, t.threshold, curState)
+			t.state = curState
 			lastState = curState
 		}
 		log.Debugf("temp=%v", temp)
