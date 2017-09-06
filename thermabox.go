@@ -188,6 +188,10 @@ func (t *Thermabox) SetProbe(probe interfaces.TemperatureSensorInterface) {
 	t.probe = probe
 }
 
+func (t *Thermabox) GetState() string {
+	return fmt.Sprintf("%v", t.state)
+}
+
 func (t *Thermabox) Run() error {
 	if t.Webserver != nil {
 		go t.Webserver.Start(t)
