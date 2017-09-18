@@ -11,10 +11,10 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/googollee/go-socket.io"
 	"github.com/gorilla/mux"
 	"github.com/gurupras/go-stoppable-net-listener"
 	thermabox_interfaces "github.com/gurupras/thermabox/interfaces"
+	websockets "github.com/homesound/simple-websockets"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -142,49 +142,42 @@ func GetStateHandler(tbox thermabox_interfaces.ThermaboxInterface, w http.Respon
 	return nil
 }
 
-func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_interfaces.ThermaboxInterface, io *socketio.Server) (http.Handler, error) {
-	if io == nil {
-		var err error
-		if io, err = socketio.NewServer(nil); err != nil {
-			return nil, fmt.Errorf("Failed to initialize socket.io: %v", err)
-		}
-		//http.Handle("/socket.io/", io)
+func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_interfaces.ThermaboxInterface, ws *websockets.WebsocketServer) (http.Handler, error) {
+	r := mux.NewRouter()
+	if ws == nil {
+		ws = websockets.NewServer(r)
 	}
 
-	// Set up socket.io routes
-	io.OnConnect("/", func(s socketio.Conn) error {
-		log.Infof("Received connection")
-		s.SetContext("")
-		return nil
-	})
-	io.OnEvent("/", "set-limits", func(s socketio.Conn, msg string) {
-		log.Infof("socket.io [set-limits]: type=%t", msg)
+	// Set up websocket routes
+	ws.On("get-limits", func(w *websockets.WebsocketClient, data interface{}) {
+		temp, threshold := tbox.GetLimits()
 		m := make(map[string]interface{})
-		err := json.Unmarshal([]byte(msg), &m)
-		if err != nil {
-			log.Errorf("socket.io [set-limits]: Failed to unmarshal message '%v': %v", msg, err)
-			return
-		}
-		temp := m["temp"].(float64)
+		m["temperature"] = temp
+		m["threshold"] = threshold
+		w.Emit("get-limits", m)
+	})
+	ws.On("set-limits", func(w *websockets.WebsocketClient, data interface{}) {
+		log.Infof("[websockets]: [set-limits]: type=%t", data)
+		m := data.(map[string]interface{})
+		temp := m["temperature"].(float64)
 		threshold := m["threshold"].(float64)
 		tbox.SetLimits(temp, threshold)
-		log.Infof("socket.io [set-limits]: Set limits to %v (+/- %v)", temp, threshold)
-		s.Emit("set-limits", "OK")
-		s.Close()
+		log.Infof("[websockets]: [set-limits]: Set limits to %v (+/- %v)", temp, threshold)
+		w.Emit("set-limits", "OK")
 	})
 
-	io.OnEvent("/", "get-temperature", func(s socketio.Conn) {
+	ws.On("get-temperature", func(w *websockets.WebsocketClient, data interface{}) {
 		temp, err := tbox.GetTemperature()
 		if err != nil {
 			log.Errorf("Failed to get temperature: %v", err)
 			return
 		}
-		m := make(map[string]interface{})
-		m["temp"] = temp
-		log.Debugf("socket.io [get-temperature]: Sending back temp: %v", temp)
-		b, _ := json.Marshal(m)
-		s.Emit("get-temperature", string(b))
-		s.Close()
+		log.Debugf("[websockets]: [get-temperature]: Sending back temp: %v", temp)
+		w.Emit("get-temperature", temp)
+	})
+	ws.On("get-state", func(w *websockets.WebsocketClient, data interface{}) {
+		state := tbox.GetState()
+		w.Emit("get-state", state)
 	})
 
 	staticPath := "static"
@@ -193,7 +186,6 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 	staticPath = filepath.Join(webserverBasePath, "static") + "/"
 	log.Infof("webserverBasePath=%v staticPath=%v", webserverBasePath, staticPath)
 
-	r := mux.NewRouter()
 	r.HandleFunc(webserverBasePath, func(w http.ResponseWriter, req *http.Request) {
 		if err := IndexHandler(path, w, req); err != nil {
 			msg := fmt.Sprintf("Failed to handle '/': %v", err)
@@ -237,7 +229,5 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 	})
 
 	r.PathPrefix(staticPath).Handler(http.StripPrefix(staticPath, http.FileServer(http.Dir(filepath.Join(path, "static")))))
-	socketioPath := filepath.Join(webserverBasePath, "socket.io") + "/"
-	r.Handle(socketioPath, io)
 	return r, nil
 }

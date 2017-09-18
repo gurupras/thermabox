@@ -3,15 +3,16 @@ package webserver
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
 
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/gorilla/websocket"
 	"github.com/gurupras/go-stoppable-net-listener"
-	"github.com/homesound/golang-socketio"
-	"github.com/homesound/golang-socketio/transport"
+	websockets "github.com/homesound/simple-websockets"
 	"github.com/parnurzeal/gorequest"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -93,19 +94,21 @@ func TestWebServer(t *testing.T) {
 }
 
 type DummyThermaboxInterface struct {
+	currentTemp float64
 	temperature float64
 	threshold   float64
 }
 
 func NewDummyThermaboxInterface() *DummyThermaboxInterface {
 	d := DummyThermaboxInterface{}
+	d.currentTemp = 114.14
 	d.temperature = 114.14
 	d.threshold = 0.2
 	return &d
 }
 
 func (d *DummyThermaboxInterface) GetTemperature() (float64, error) {
-	return d.temperature, nil
+	return d.currentTemp, nil
 }
 func (d *DummyThermaboxInterface) GetLimits() (temp float64, threshold float64) {
 	return d.temperature, d.threshold
@@ -115,13 +118,19 @@ func (d *DummyThermaboxInterface) SetLimits(temp float64, threshold float64) {
 	d.threshold = threshold
 }
 
-// FIXME: Socket.io client code is broken. Cannot run more than 1 request at the moment
-func TestSocketIo(t *testing.T) {
-	t.Skip()
-	require := require.New(t)
+func (d *DummyThermaboxInterface) GetState() string {
+	temp, _ := d.GetTemperature()
+	if temp < d.temperature-d.threshold {
+		return "heating_up"
+	} else if temp >= d.temperature-d.threshold && temp <= d.temperature+d.threshold {
+		return "stable"
+	} else {
+		return "cooling_down"
+	}
+}
 
-	//io, err := socketio.NewServer(nil)
-	//require.Nil(err)
+func TestWebsockets(t *testing.T) {
+	require := require.New(t)
 
 	handler, err := InitializeWebServer(".", "/", NewDummyThermaboxInterface(), nil)
 	require.Nil(err)
@@ -129,55 +138,69 @@ func TestSocketIo(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
-	// Attach socket.io
-	//mux.Handle("/socket.io/", io)
 	server := http.Server{}
 	server.Handler = mux
 	snl, err := stoppablenetlistener.New(31122)
 	require.Nil(err)
 	require.NotNil(snl)
+	defer snl.Stop()
 	go func() {
 		server.Serve(snl)
 	}()
 
 	time.Sleep(100 * time.Millisecond)
 
-	c, err := gosocketio.Dial(
-		gosocketio.GetUrl("localhost", 31122, false),
-		transport.GetDefaultWebsocketTransport(),
-	)
+	u := url.URL{
+		Scheme: "ws",
+		Host:   "localhost:31122",
+		Path:   "/ws",
+	}
+	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	defer c.Close()
 	require.Nil(err)
 	require.NotNil(c)
+	client := websockets.NewClient(c)
+	go client.ProcessMessages()
 
 	wg := sync.WaitGroup{}
-	c.On("get-temperature", func(ch *gosocketio.Channel, s string) {
-		m := make(map[string]interface{})
-		err := json.Unmarshal([]byte(s), &m)
-		require.Nil(err, "Failed to unmarshal data from server: %v: %v", s, err)
-		temp := m["temp"]
+	client.On("get-temperature", func(w *websockets.WebsocketClient, data interface{}) {
+		log.Debugf("[client] Received get-temperature: %t", data)
+		temp := data.(float64)
 		require.Equal(114.14, temp)
 		wg.Done()
 	})
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		err = c.Emit("get-temperature", nil)
+		err = client.Emit("get-temperature", nil)
 		require.Nil(err)
 		wg.Wait()
-		log.Infof("get-temperature passed")
+		log.Debugf("get-temperature passed")
 	}
 
 	wg.Add(1)
 	m := make(map[string]interface{})
 	m["temperature"] = 42.2
-	m["limits"] = 0.4
-	b, err := json.Marshal(m)
+	m["threshold"] = 0.4
+	client.On("set-limits", func(w *websockets.WebsocketClient, data interface{}) {
+		client.On("get-limits", func(w *websockets.WebsocketClient, data interface{}) {
+			require.Equal(m, data)
+			wg.Done()
+		})
+		client.Emit("get-limits", nil)
+	})
+	err = client.Emit("set-limits", m)
 	require.Nil(err)
-	c.On("set-limits", func(ch *gosocketio.Channel, s string) {
+	wg.Wait()
+
+	// Now get-state
+	// It should be heating up
+	log.Debugf("Testing get-state")
+	wg.Add(1)
+	client.On("get-state", func(w *websockets.WebsocketClient, data interface{}) {
+		require.Equal("cooling_down", data)
 		wg.Done()
 	})
-	_ = b
-	err = c.Emit("set-limits", nil)
-	require.Nil(err)
+	client.Emit("get-state", nil)
 	wg.Wait()
 }
 
