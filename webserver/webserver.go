@@ -15,6 +15,7 @@ import (
 	"github.com/gurupras/go-stoppable-net-listener"
 	thermabox_interfaces "github.com/gurupras/thermabox/interfaces"
 	websockets "github.com/homesound/simple-websockets"
+	"github.com/rs/cors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -74,8 +75,9 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
+	handler := cors.Default().Handler(mux)
 	server := http.Server{}
-	server.Handler = mux
+	server.Handler = handler
 	snl, err := stoppablenetlistener.New(w.Port)
 	if err != nil {
 		log.Fatalf("%v", err)
