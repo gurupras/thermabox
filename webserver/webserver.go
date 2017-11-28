@@ -75,9 +75,9 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
-	handler := cors.Default().Handler(mux)
+	corsHandler := cors.Default().Handler(mux)
 	server := http.Server{}
-	server.Handler = handler
+	server.Handler = corsHandler
 	snl, err := stoppablenetlistener.New(w.Port)
 	if err != nil {
 		log.Fatalf("%v", err)
