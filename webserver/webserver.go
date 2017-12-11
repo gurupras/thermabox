@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	yaml "gopkg.in/yaml.v2"
 
@@ -15,14 +16,16 @@ import (
 	"github.com/gurupras/go-stoppable-net-listener"
 	thermabox_interfaces "github.com/gurupras/thermabox/interfaces"
 	websockets "github.com/homesound/simple-websockets"
+	"github.com/parnurzeal/gorequest"
 	"github.com/rs/cors"
 	log "github.com/sirupsen/logrus"
 )
 
 type Webserver struct {
-	Port int    `yaml:"port"`
-	Path string `yaml:"path"`
-	snl  *stoppablenetlistener.StoppableNetListener
+	Port    int    `yaml:"port"`
+	Path    string `yaml:"path"`
+	Forward string `yaml:"forward"`
+	snl     *stoppablenetlistener.StoppableNetListener
 }
 
 // Expects configuration to be under 'webserver'
@@ -58,6 +61,11 @@ unmarshal:
 	} else {
 		w.Path = "."
 	}
+	if forward, ok := m["forward"]; ok {
+		w.Forward = forward.(string)
+	} else {
+		w.Forward = ""
+	}
 	return nil
 }
 
@@ -68,8 +76,20 @@ func (w *Webserver) Stop() {
 		w.snl = nil
 	}
 }
+
+func (w *Webserver) SetLimits(tbox thermabox_interfaces.ThermaboxInterface, temp float64, threshold float64) {
+	if strings.Compare(w.Forward, "") != 0 {
+		req := gorequest.New()
+		data := make(map[string]float64)
+		data["temperature"] = temp
+		data["threshold"] = threshold
+		req.Post(w.Forward).Send(data).End()
+	}
+	tbox.SetLimits(temp, threshold)
+}
+
 func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
-	handler, err := InitializeWebServer(w.Path, "/", tbox, nil)
+	handler, err := InitializeWebServer(w.Path, "/", tbox, nil, w)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
@@ -98,7 +118,7 @@ func IndexHandler(path string, w http.ResponseWriter, req *http.Request) error {
 	return err
 }
 
-func GetTemperatureHandler(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+func GetTemperatureHandler(webserver *Webserver, tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(200)
 	temp, err := tbox.GetTemperature()
@@ -109,7 +129,7 @@ func GetTemperatureHandler(tbox thermabox_interfaces.ThermaboxInterface, w http.
 	return nil
 }
 
-func GetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+func GetTemperatureLimits(webserver *Webserver, tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(200)
 	temp, threshold := tbox.GetLimits()
@@ -121,7 +141,7 @@ func GetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.R
 	return nil
 }
 
-func SetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+func SetTemperatureLimits(webserver *Webserver, tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(200)
 	temp, err := strconv.ParseFloat(req.FormValue("temperature"), 64)
@@ -132,11 +152,11 @@ func SetTemperatureLimits(tbox thermabox_interfaces.ThermaboxInterface, w http.R
 	if err != nil {
 		return fmt.Errorf("Failed to parse float64: %v: %v", req.FormValue("threshold"), err)
 	}
-	tbox.SetLimits(temp, threshold)
+	webserver.SetLimits(tbox, temp, threshold)
 	return nil
 }
 
-func GetStateHandler(tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+func GetStateHandler(webserver *Webserver, tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(200)
 	state := tbox.GetState()
@@ -144,7 +164,7 @@ func GetStateHandler(tbox thermabox_interfaces.ThermaboxInterface, w http.Respon
 	return nil
 }
 
-func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_interfaces.ThermaboxInterface, ws *websockets.WebsocketServer) (http.Handler, error) {
+func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_interfaces.ThermaboxInterface, ws *websockets.WebsocketServer, webserver *Webserver) (http.Handler, error) {
 	r := mux.NewRouter()
 	if ws == nil {
 		ws = websockets.NewServer(r)
@@ -163,7 +183,7 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 		m := data.(map[string]interface{})
 		temp := m["temperature"].(float64)
 		threshold := m["threshold"].(float64)
-		tbox.SetLimits(temp, threshold)
+		webserver.SetLimits(tbox, temp, threshold)
 		log.Infof("[websockets]: [set-limits]: Set limits to %v (+/- %v)", temp, threshold)
 		w.Emit("set-limits", "OK")
 	})
@@ -198,7 +218,7 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 	})
 	// Extra paths
 	r.HandleFunc(filepath.Join(webserverBasePath, "get-temperature/"), func(w http.ResponseWriter, req *http.Request) {
-		if err := GetTemperatureHandler(tbox, w, req); err != nil {
+		if err := GetTemperatureHandler(webserver, tbox, w, req); err != nil {
 			msg := fmt.Sprintf("Failed to handle '/get-temperature': %v", err)
 			log.Errorf(msg)
 			w.WriteHeader(503)
@@ -206,7 +226,7 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 		}
 	})
 	r.HandleFunc(filepath.Join(webserverBasePath, "get-limits/"), func(w http.ResponseWriter, req *http.Request) {
-		if err := GetTemperatureLimits(tbox, w, req); err != nil {
+		if err := GetTemperatureLimits(webserver, tbox, w, req); err != nil {
 			msg := fmt.Sprintf("Failed to handle '/get-limits': %v", err)
 			log.Errorf(msg)
 			w.WriteHeader(503)
@@ -214,7 +234,7 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 		}
 	})
 	r.HandleFunc(filepath.Join(webserverBasePath, "set-limits/"), func(w http.ResponseWriter, req *http.Request) {
-		if err := SetTemperatureLimits(tbox, w, req); err != nil {
+		if err := SetTemperatureLimits(webserver, tbox, w, req); err != nil {
 			msg := fmt.Sprintf("Failed to handle '/set-limits': %v", err)
 			log.Errorf(msg)
 			w.WriteHeader(503)
@@ -222,7 +242,7 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 		}
 	})
 	r.HandleFunc(filepath.Join(webserverBasePath, "get-state/"), func(w http.ResponseWriter, req *http.Request) {
-		if err := GetStateHandler(tbox, w, req); err != nil {
+		if err := GetStateHandler(webserver, tbox, w, req); err != nil {
 			msg := fmt.Sprintf("Failed to handle '/get-state': %v", err)
 			log.Errorf(msg)
 			w.WriteHeader(503)
