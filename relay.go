@@ -2,6 +2,8 @@ package thermabox
 
 import (
 	"fmt"
+	"os"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -101,33 +103,63 @@ func (r *Relay) Toggle(swtch int) error {
 }
 
 func (r *Relay) On(swtch int) error {
+	var (
+		isOn bool
+		err  error
+	)
 	if p, ok := r.SwitchMap[swtch]; !ok {
 		return fmt.Errorf("Switch %v not initialized in relay", swtch)
 	} else {
 		pin := rpio.Pin(p)
-		switch r.activeHigh {
-		case true:
-			pin.High()
-		case false:
-			pin.Low()
+		for {
+			switch r.activeHigh {
+			case true:
+				pin.High()
+			case false:
+				pin.Low()
+			}
+			if isOn, err = r.IsOn(1); err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to check if relay is on: %v\n", err)
+				break
+			} else if isOn {
+				break
+			} else {
+				fmt.Fprintf(os.Stderr, "Failed to turn on relay...retrying\n")
+			}
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
-	return nil
+	return err
 }
 
 func (r *Relay) Off(swtch int) error {
+	var (
+		isOn bool
+		err  error
+	)
 	if p, ok := r.SwitchMap[swtch]; !ok {
 		return fmt.Errorf("Switch %v not initialized in relay", swtch)
 	} else {
 		pin := rpio.Pin(p)
-		switch r.activeHigh {
-		case true:
-			pin.Low()
-		case false:
-			pin.High()
+		for {
+			switch r.activeHigh {
+			case true:
+				pin.Low()
+			case false:
+				pin.High()
+			}
+			if isOn, err = r.IsOn(1); err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to check if relay is on: %v", err)
+				break
+			} else if !isOn {
+				break
+			} else {
+				fmt.Fprintf(os.Stderr, "Failed to turn off relay...retrying\n")
+			}
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
-	return nil
+	return err
 }
 
 func (r *Relay) IsOn(swtch int) (bool, error) {
