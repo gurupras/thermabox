@@ -30,6 +30,12 @@ type Webserver struct {
 	snl     *stoppablenetlistener.StoppableNetListener
 }
 
+func New() *Webserver {
+	ws := &Webserver{}
+	ws.Https = make(map[string]string)
+	return ws
+}
+
 // Expects configuration to be under 'webserver'
 func (w *Webserver) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	m := make(map[string]interface{})
