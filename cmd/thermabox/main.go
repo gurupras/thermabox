@@ -19,6 +19,8 @@ var (
 	conf         = app.Arg("conf", "Configuration file (YAML)").Required().String()
 	verbose      = app.Flag("verbose", "Verbose logging").Short('v').Default("false").Bool()
 	sensorSource = app.Flag("sensor", "Temperature sensor source").Short('S').Default("usb").String()
+	temperature  = app.Flag("temperature", "Override conf temperature").Short('t').Default("-100").Float64()
+	threshold    = app.Flag("threshold", "Override conf threshold").Short('T').Default("-100").Float64()
 )
 
 func main() {
@@ -40,6 +42,15 @@ func main() {
 	if err := yaml.Unmarshal(data, &tbox); err != nil {
 		log.Fatalf("Failed to unmarshal yaml: %v", err)
 	}
+
+	def_temperature, def_threshold := tbox.GetLimits()
+	if *temperature != -100 {
+		def_temperature = *temperature
+	}
+	if *threshold != -100 {
+		def_threshold = *threshold
+	}
+	tbox.SetLimits(def_temperature, def_threshold)
 
 	// Get a hold of the temperature sensor
 	var sensor interfaces.TemperatureSensorInterface
