@@ -22,10 +22,11 @@ import (
 )
 
 type Webserver struct {
-	Port  int               `yaml:"port"`
-	Path  string            `yaml:"path"`
-	Https map[string]string `yaml:"https"`
-	snl   *stoppablenetlistener.StoppableNetListener
+	Port    int               `yaml:"port"`
+	Path    string            `yaml:"path"`
+	Forward string            `yaml:"forward"`
+	Https   map[string]string `yaml:"https"`
+	snl     *stoppablenetlistener.StoppableNetListener
 }
 
 // Expects configuration to be under 'webserver'
