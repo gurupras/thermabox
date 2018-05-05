@@ -146,3 +146,78 @@ func (r *Relay) IsOn(swtch int) (bool, error) {
 		return state == onState, nil
 	}
 }
+
+// This is a fake relay used for testing
+// Ideally, this should be implemented using some kind of mock object
+type FakeRelay struct {
+	activeHigh bool       `yaml:"active_high"`
+	pins       []rpio.Pin `yaml:"pins"`
+	SwitchMap  map[int]uint8
+}
+
+func NewFakeRelay(activeHigh bool, pins []int) *FakeRelay {
+	f := FakeRelay{}
+	f.activeHigh = activeHigh
+	p := make([]rpio.Pin, len(pins))
+	sMap := make(map[int]uint8)
+	for idx, pin := range pins {
+		p[idx] = rpio.Pin(pin)
+		sMap[pin] = 1
+	}
+	f.pins = p
+	f.SwitchMap = sMap
+	return &f
+}
+
+func (f *FakeRelay) ActiveHigh() bool {
+	return f.activeHigh
+}
+func (f *FakeRelay) commonHandle(swtch int) error {
+	if _, ok := f.SwitchMap[swtch]; !ok {
+		return fmt.Errorf("Switch %v not initialized in relay", swtch)
+	} else {
+		return nil
+	}
+}
+
+func (f *FakeRelay) Toggle(swtch int) error {
+	return f.commonHandle(swtch)
+}
+func (f *FakeRelay) On(swtch int) error {
+	return f.commonHandle(swtch)
+}
+func (f *FakeRelay) Off(swtch int) error {
+	return f.commonHandle(swtch)
+}
+
+func (f *FakeRelay) GetSwitchMap() map[int]uint8 {
+	return f.SwitchMap
+}
+
+// TODO: Properly implement IsOn() after a fake rpio.Pin interface is implemented
+func (f *FakeRelay) IsOn(swtch int) (bool, error) {
+	log.Warnf("IsOn() hasn't been implemented!")
+	return false, nil
+}
+
+func (f *FakeRelay) UnmarshalYAML(unmarshal func(i interface{}) error) error {
+	m := make(map[string]interface{})
+	err := unmarshal(&m)
+	if err != nil {
+		return err
+	}
+	if _, ok := m["active_high"]; !ok {
+		m["active_high"] = false
+	}
+	activeHigh := m["active_high"].(bool)
+	pinsInterface := m["pins"].([]interface{})
+	pins := make([]rpio.Pin, len(pinsInterface))
+	sMap := make(map[int]uint8)
+	for i := 0; i < len(pins); i++ {
+		pins[i] = rpio.Pin(pinsInterface[i].(int))
+		sMap[int(pins[i])] = 1
+	}
+	relay := &FakeRelay{activeHigh, pins, sMap}
+	*f = *relay
+	return nil
+}
