@@ -1,6 +1,7 @@
 package webserver
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -67,10 +68,11 @@ unmarshal:
 	} else {
 		w.Forward = ""
 	}
-	if https, ok := m["https"]; ok {
+	if httpsIf, ok := m["https"]; ok {
 		// Parse HTTPS files
-		w.https["key"] = https["key"].(string)
-		w.https["cert"] = https["cert"].(string)
+		https := httpsIf.(map[string]interface{})
+		w.Https["key"] = https["key"].(string)
+		w.Https["cert"] = https["cert"].(string)
 	}
 	return nil
 }
@@ -114,7 +116,18 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 		// Only HTTP server
 		server.Serve(snl)
 	} else {
-		server.ServeTLS(snl, nil, w.Https["cert"], w.Https["key"])
+		tlsConfig := &tls.Config{}
+		server.TLSConfig = tlsConfig
+		tlsConfig.ClientAuth = tls.RequireAnyClientCert
+		tlsConfig.NextProtos = []string{"http/1.1"}
+
+		tlsConfig.Certificates = make([]tls.Certificate, 1)
+		tlsConfig.Certificates[0], err = tls.LoadX509KeyPair(w.Https["cert"], w.Https["key"])
+		if err != nil {
+			log.Fatalf("Could not start HTTPS server: %v", err)
+		}
+		tlsListener := tls.NewListener(snl, tlsConfig)
+		server.Serve(tlsListener)
 	}
 }
 
