@@ -22,10 +22,10 @@ import (
 )
 
 type Webserver struct {
-	Port    int    `yaml:"port"`
-	Path    string `yaml:"path"`
-	Forward string `yaml:"forward"`
-	snl     *stoppablenetlistener.StoppableNetListener
+	Port  int               `yaml:"port"`
+	Path  string            `yaml:"path"`
+	Https map[string]string `yaml:"https"`
+	snl   *stoppablenetlistener.StoppableNetListener
 }
 
 // Expects configuration to be under 'webserver'
@@ -66,6 +66,11 @@ unmarshal:
 	} else {
 		w.Forward = ""
 	}
+	if https, ok := m["https"]; ok {
+		// Parse HTTPS files
+		w.https["key"] = https["key"].(string)
+		w.https["cert"] = https["cert"].(string)
+	}
 	return nil
 }
 
@@ -104,7 +109,12 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 	}
 	w.snl = snl
 	log.Info("Starting webserver on port: %v", w.Port)
-	server.Serve(snl)
+	if len(w.Https) == 0 {
+		// Only HTTP server
+		server.Serve(snl)
+	} else {
+		server.ServeTLS(snl, nil, w.Https["cert"], w.Https["key"])
+	}
 }
 
 func IndexHandler(path string, w http.ResponseWriter, req *http.Request) error {
