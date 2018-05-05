@@ -70,7 +70,7 @@ unmarshal:
 	}
 	if httpsIf, ok := m["https"]; ok {
 		// Parse HTTPS files
-		https := httpsIf.(map[string]interface{})
+		https := httpsIf.(map[interface{}]interface{})
 		w.Https["key"] = https["key"].(string)
 		w.Https["cert"] = https["cert"].(string)
 	}
