@@ -167,7 +167,7 @@ func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 
 	// Parse webserver
 	if _, ok := m["webserver"]; ok {
-		ws := &webserver.Webserver{}
+		ws := webserver.New()
 		b, _ := yaml.Marshal(m["webserver"])
 		if err := yaml.Unmarshal(b, ws); err != nil {
 			return err
