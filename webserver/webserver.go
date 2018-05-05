@@ -20,9 +20,10 @@ import (
 )
 
 type Webserver struct {
-	Port int    `yaml:"port"`
-	Path string `yaml:"path"`
-	snl  *stoppablenetlistener.StoppableNetListener
+	Port  int               `yaml:"port"`
+	Path  string            `yaml:"path"`
+	Https map[string]string `yaml:"https"`
+	snl   *stoppablenetlistener.StoppableNetListener
 }
 
 // Expects configuration to be under 'webserver'
@@ -57,6 +58,11 @@ unmarshal:
 		w.Path = path.(string)
 	} else {
 		w.Path = "."
+	}
+	if https, ok := m["https"]; ok {
+		// Parse HTTPS files
+		w.https["key"] = https["key"].(string)
+		w.https["cert"] = https["cert"].(string)
 	}
 	return nil
 }
