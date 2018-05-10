@@ -36,14 +36,16 @@ type Element struct {
 }
 
 func (e *Element) On() error {
-	if e.ToggleDelay > 0 {
-		now := time.Now()
-		sinceLastOn := now.Sub(e.lastOn)
-		sleepDuration := e.ToggleDelay.Nanoseconds() - sinceLastOn.Nanoseconds()
-		if sleepDuration > 0 {
-			return ElementToggleDelayError{"Minimum delay not elapsed"}
+	/*	// FIXME: This doesn't seem to be working
+		if e.ToggleDelay > 0 {
+			now := time.Now()
+			sinceLastOn := now.Sub(e.lastOn)
+			sleepDuration := e.ToggleDelay.Nanoseconds() - sinceLastOn.Nanoseconds()
+			if sleepDuration > 0 {
+				return ElementToggleDelayError{"Minimum delay not elapsed"}
+			}
 		}
-	}
+	*/
 	return e.relay.On(1)
 }
 
