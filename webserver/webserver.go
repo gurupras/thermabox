@@ -26,6 +26,7 @@ type Webserver struct {
 	Port    int               `yaml:"port"`
 	Path    string            `yaml:"path"`
 	Forward string            `yaml:"forward"`
+	Publish string            `yaml:"publish"`
 	Https   map[string]string `yaml:"https"`
 	snl     *stoppablenetlistener.StoppableNetListener
 }
@@ -74,6 +75,11 @@ unmarshal:
 	} else {
 		w.Forward = ""
 	}
+	if publish, ok := m["publish"]; ok {
+		w.Publish = publish.(string)
+	} else {
+		w.Publish = ""
+	}
 	if httpsIf, ok := m["https"]; ok {
 		// Parse HTTPS files
 		https := httpsIf.(map[interface{}]interface{})
@@ -107,6 +113,18 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
+
+	// Register a channel with thermabox to receive updated
+	tboxChan := make(chan *thermabox_interfaces.ThermaboxState, 0)
+	go func() {
+		for data := range tboxChan {
+			if strings.Compare(w.Publish, "") != 0 {
+				gorequest.New().Post(w.Publish).Send(data).End()
+			}
+		}
+	}()
+	tbox.RegisterChannel(tboxChan)
+
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
 	corsHandler := cors.Default().Handler(mux)
