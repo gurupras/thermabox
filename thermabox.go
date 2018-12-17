@@ -9,7 +9,7 @@ import (
 	"github.com/gurupras/thermabox/interfaces"
 	"github.com/gurupras/thermabox/webserver"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type ElementToggleDelayError struct {
@@ -209,6 +209,7 @@ func (t *Thermabox) Run() error {
 
 	lastState := interfaces.UNKNOWN
 	curState := interfaces.UNKNOWN
+	lastTempTimestamp := time.Now().UnixNano() / 1000000
 	var (
 		upperLimit float64
 		lowerLimit float64
@@ -217,16 +218,20 @@ func (t *Thermabox) Run() error {
 		lowerLimit = t.temperature - t.threshold
 		upperLimit = t.temperature + t.threshold
 
+		now := time.Now().UnixNano() / 1000000
 		temp, err := t.GetTemperature()
 		if err != nil {
-			log.Errorf("Failed to get temperature: %v", err)
-			// Turn off all elements and exit
-			t.heatingElement.Off()
-			t.coolingElement.Off()
-			log.Fatalf("Shutting down at time: %v", time.Now())
-			break
+			if now-lastTempTimestamp > 10*1e3 {
+				log.Errorf("Failed to get temperature: %v", err)
+				// Turn off all elements and exit
+				t.heatingElement.Off()
+				t.coolingElement.Off()
+				log.Fatalf("Shutting down at time: %v", time.Now())
+				break
+			}
+			continue
 		}
-		now := time.Now().UnixNano() / 1000000
+		lastTempTimestamp = now
 
 		if t.cutoffTemp != 0.0 && temp > t.cutoffTemp {
 			log.Errorf("Temperature > cutoff temperature: %v > %v", temp, t.cutoffTemp)
