@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gurupras/thermabox/interfaces"
@@ -92,6 +93,8 @@ type Thermabox struct {
 	state                interfaces.State
 	listeners            []chan *interfaces.ThermaboxState
 	*webserver.Webserver `yaml:"webserver"`
+	disabled             bool `yaml:"disabled"`
+	mutex                sync.Mutex
 }
 
 func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
@@ -201,6 +204,19 @@ func (t *Thermabox) GetState() string {
 	return fmt.Sprintf("%v", t.state)
 }
 
+func (t *Thermabox) DisableThermabox() {
+	t.disabled = true
+	t.heatingElement.Off()
+	t.coolingElement.Off()
+}
+
+func (t *Thermabox) EnableThermabox() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.state = interfaces.UNKNOWN
+	t.disabled = false
+}
+
 func (t *Thermabox) Run() error {
 	if t.Webserver != nil {
 		go t.Webserver.Start(t)
@@ -208,7 +224,7 @@ func (t *Thermabox) Run() error {
 	}
 
 	lastState := interfaces.UNKNOWN
-	curState := interfaces.UNKNOWN
+	t.state = interfaces.UNKNOWN
 	lastTempTimestamp := time.Now().UnixNano() / 1000000
 	var (
 		upperLimit float64
@@ -241,35 +257,40 @@ func (t *Thermabox) Run() error {
 			break
 		}
 
-		if curState == interfaces.STABLE || curState == interfaces.UNKNOWN {
+		t.mutex.Lock()
+		if t.state == interfaces.STABLE || t.state == interfaces.UNKNOWN {
 			if temp < lowerLimit {
 				// Temperature has dropped below threshold
 				// Start heating element to warm it back up
-				curState = interfaces.HEATING_UP
-				if err := t.coolingElement.Off(); err != nil {
-					log.Errorf("Failed to turn off cooling element: %v", err)
-				}
-				if err := t.heatingElement.On(); err != nil {
-					if _, ok := err.(ElementToggleDelayError); !ok {
-						log.Errorf("Failed to turn on heating element: %v", err)
-					} else {
-						// This was just a regular toggle delay error..just continue
+				t.state = interfaces.HEATING_UP
+				if !t.disabled {
+					if err := t.coolingElement.Off(); err != nil {
+						log.Errorf("Failed to turn off cooling element: %v", err)
+					}
+					if err := t.heatingElement.On(); err != nil {
+						if _, ok := err.(ElementToggleDelayError); !ok {
+							log.Errorf("Failed to turn on heating element: %v", err)
+						} else {
+							// This was just a regular toggle delay error..just continue
+						}
 					}
 				}
 			} else if temp > upperLimit {
-				curState = interfaces.COOLING_DOWN
-				if err := t.heatingElement.Off(); err != nil {
-					log.Errorf("Failed to turn off heating element: %v", err)
-				}
-				if err := t.coolingElement.On(); err != nil {
-					if _, ok := err.(ElementToggleDelayError); !ok {
-						log.Errorf("Failed to turn on cooling element: %v", err)
-					} else {
-						// This was just a regular toggle delay error..just continue
+				t.state = interfaces.COOLING_DOWN
+				if !t.disabled {
+					if err := t.heatingElement.Off(); err != nil {
+						log.Errorf("Failed to turn off heating element: %v", err)
+					}
+					if err := t.coolingElement.On(); err != nil {
+						if _, ok := err.(ElementToggleDelayError); !ok {
+							log.Errorf("Failed to turn on cooling element: %v", err)
+						} else {
+							// This was just a regular toggle delay error..just continue
+						}
 					}
 				}
 			} else {
-				curState = interfaces.STABLE
+				t.state = interfaces.STABLE
 			}
 		} else {
 			// Check if stable
@@ -283,7 +304,7 @@ func (t *Thermabox) Run() error {
 				// We only deal with 1 decimal point of precision
 				val := round(temp, 0.5, 1)
 				expected := round(t.temperature, 0.5, 1)
-				switch curState {
+				switch t.state {
 				case interfaces.HEATING_UP:
 					if val >= expected {
 						cutoff = true
@@ -301,7 +322,7 @@ func (t *Thermabox) Run() error {
 			// Common cutoff logic
 			if cutoff {
 				log.Debugf("Attempting to turn off heating/cooling elements")
-				curState = interfaces.STABLE
+				t.state = interfaces.STABLE
 				if err := t.heatingElement.Off(); err != nil {
 					log.Errorf("Failed to turn off heating element: %v", err)
 				}
@@ -310,10 +331,9 @@ func (t *Thermabox) Run() error {
 				}
 			}
 		}
-		if lastState != curState {
-			log.Infof("temp=%.2f target=%.2f threshold=%.2f -> %v", temp, t.temperature, t.threshold, curState)
-			t.state = curState
-			lastState = curState
+		if lastState != t.state {
+			log.Infof("temp=%.2f target=%.2f threshold=%.2f -> %v", temp, t.temperature, t.threshold, t.state)
+			lastState = t.state
 		}
 
 		go func(temperature float64, timestamp int64, state interfaces.State) {
@@ -325,7 +345,8 @@ func (t *Thermabox) Run() error {
 			for _, channel := range t.listeners {
 				channel <- tboxState
 			}
-		}(temp, now, curState)
+		}(temp, now, t.state)
+		t.mutex.Unlock()
 
 		log.Debugf("temp=%v", temp)
 		time.Sleep(500 * time.Millisecond)
