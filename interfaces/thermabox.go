@@ -29,4 +29,6 @@ type ThermaboxInterface interface {
 	SetLimits(temperature float64, threshold float64)
 	GetLimits() (temperature float64, threshold float64)
 	GetState() string
+	DisableThermabox()
+	EnableThermabox()
 }

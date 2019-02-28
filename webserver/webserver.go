@@ -14,7 +14,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/gorilla/mux"
-	"github.com/gurupras/go-stoppable-net-listener"
+	stoppablenetlistener "github.com/gurupras/go-stoppable-net-listener"
 	thermabox_interfaces "github.com/gurupras/thermabox/interfaces"
 	websockets "github.com/homesound/simple-websockets"
 	"github.com/parnurzeal/gorequest"
@@ -106,6 +106,14 @@ func (w *Webserver) SetLimits(tbox thermabox_interfaces.ThermaboxInterface, temp
 		req.Post(w.Forward).Send(data).End()
 	}
 	tbox.SetLimits(temp, threshold)
+}
+
+func (w *Webserver) DisableThermabox(tbox thermabox_interfaces.ThermaboxInterface) {
+	tbox.DisableThermabox()
+}
+
+func (w *Webserver) EnableThermabox(tbox thermabox_interfaces.ThermaboxInterface) {
+	tbox.EnableThermabox()
 }
 
 func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
@@ -212,6 +220,20 @@ func GetStateHandler(webserver *Webserver, tbox thermabox_interfaces.ThermaboxIn
 	return nil
 }
 
+func DisableThermaboxHandler(webserver *Webserver, tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(200)
+	tbox.DisableThermabox()
+	return nil
+}
+
+func EnableThermaboxHandler(webserver *Webserver, tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(200)
+	tbox.EnableThermabox()
+	return nil
+}
+
 func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_interfaces.ThermaboxInterface, ws *websockets.WebsocketServer, webserver *Webserver) (http.Handler, error) {
 	r := mux.NewRouter()
 	if ws == nil {
@@ -234,6 +256,20 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 		webserver.SetLimits(tbox, temp, threshold)
 		log.Infof("[websockets]: [set-limits]: Set limits to %v (+/- %v)", temp, threshold)
 		w.Emit("set-limits", "OK")
+	})
+
+	ws.On("disable-thermabox", func(w *websockets.WebsocketClient, data interface{}) {
+		log.Infof("[websockets]: [disable-thermabox]: type=%t", data)
+		webserver.DisableThermabox(tbox)
+		log.Infof("[websockets]: [disable-thermabox]: Thermabox disabled")
+		w.Emit("disable-thermabox", "OK")
+	})
+
+	ws.On("enable-thermabox", func(w *websockets.WebsocketClient, data interface{}) {
+		log.Infof("[websockets]: [enable-thermabox]: type=%t", data)
+		webserver.EnableThermabox(tbox)
+		log.Infof("[websockets]: [enable-thermabox]: Thermabox enabled")
+		w.Emit("enable-thermabox", "OK")
 	})
 
 	ws.On("get-temperature", func(w *websockets.WebsocketClient, data interface{}) {
@@ -292,6 +328,24 @@ func InitializeWebServer(path string, webserverBasePath string, tbox thermabox_i
 	r.HandleFunc(filepath.Join(webserverBasePath, "get-state/"), func(w http.ResponseWriter, req *http.Request) {
 		if err := GetStateHandler(webserver, tbox, w, req); err != nil {
 			msg := fmt.Sprintf("Failed to handle '/get-state': %v", err)
+			log.Errorf(msg)
+			w.WriteHeader(503)
+			w.Write([]byte(msg))
+		}
+	})
+
+	r.HandleFunc(filepath.Join(webserverBasePath, "disable-thermabox/"), func(w http.ResponseWriter, req *http.Request) {
+		if err := DisableThermaboxHandler(webserver, tbox, w, req); err != nil {
+			msg := fmt.Sprintf("Failed to handle '/disable-thermabox': %v", err)
+			log.Errorf(msg)
+			w.WriteHeader(503)
+			w.Write([]byte(msg))
+		}
+	})
+
+	r.HandleFunc(filepath.Join(webserverBasePath, "enable-thermabox/"), func(w http.ResponseWriter, req *http.Request) {
+		if err := EnableThermaboxHandler(webserver, tbox, w, req); err != nil {
+			msg := fmt.Sprintf("Failed to handle '/enable-thermabox': %v", err)
 			log.Errorf(msg)
 			w.WriteHeader(503)
 			w.Write([]byte(msg))
