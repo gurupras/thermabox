@@ -64,7 +64,10 @@ func main() {
 		}
 	default:
 		// Assumes HTTP
-		sensor = &thermabox.HTTPProbe{*sensorSource}
+		sensor = &thermabox.HTTPProbe{
+			Url: *sensorSource,
+			Name: "thermabox-probe",
+		}
 	}
 	tbox.SetProbe(sensor)
 

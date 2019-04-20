@@ -11,6 +11,7 @@ import (
 
 type HTTPProbe struct {
 	Url string `yaml:"url"`
+	Name string `yaml:"name"`
 }
 
 func (p *HTTPProbe) GetTemperature() (float64, error) {
@@ -41,4 +42,8 @@ func (p *HTTPProbe) GetTemperature() (float64, error) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return 0, err
+}
+
+func (p *HTTPProbe) GetName() string {
+	return p.Name
 }

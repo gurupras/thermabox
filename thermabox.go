@@ -90,6 +90,7 @@ type Thermabox struct {
 	cutoffAtThreshold    bool     `yaml:"cutoff_at_threshold"`
 	cutoffTemp           float64  `yaml:"cutoff_temperature"`
 	probe                interfaces.TemperatureSensorInterface
+	extraProbes          []interfaces.TemperatureSensorInterface
 	state                interfaces.State
 	listeners            []chan *interfaces.ThermaboxState
 	*webserver.Webserver `yaml:"webserver"`
@@ -171,6 +172,20 @@ func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 		}
 		t.Webserver = ws
 	}
+
+	if _, ok := m["extra_probes"]; ok {
+		b, _ := yaml.Marshal(m["extra_probes"])
+		var extraProbes []HTTPProbe
+		if err := yaml.Unmarshal(b, &extraProbes); err != nil {
+			return err
+		}
+		t.extraProbes = make([]interfaces.TemperatureSensorInterface, len(extraProbes))
+		for idx, probe := range extraProbes {
+			t.extraProbes[idx] = &probe
+			log.Infof("Added extra probe: %v\n", probe)
+		}
+	}
+
 	t.temperature = temperature
 	t.threshold = threshold
 	t.cutoffAtThreshold = cutoffAtThreshold
@@ -185,6 +200,30 @@ func (t *Thermabox) RegisterChannel(c chan *interfaces.ThermaboxState) {
 
 func (t *Thermabox) GetTemperature() (float64, error) {
 	return t.probe.GetTemperature()
+}
+
+func (t *Thermabox) GetAllTemperatures() map[string]interface{} {
+	ret := make(map[string]interface{})
+	probes := make([]interfaces.TemperatureSensorInterface, 0)
+	probes = append(probes, t)
+	probes = append(probes, t.extraProbes...)
+	for _, probe := range probes {
+		val, err := probe.GetTemperature()
+		entry := make(map[string]interface{})
+		if err != nil {
+			entry["error"] = fmt.Sprintf("Failed to get temperature from probe: %v: %v", probe.GetName(), err)
+			log.Errorf("%v\n", entry["error"])
+		} else {
+			// log.Debugf("%v: %v\n", probe.GetName(), val)
+			entry["temp"] = val
+		}
+		ret[probe.GetName()] = entry
+	}
+	return ret
+}
+
+func (t *Thermabox) GetName() string {
+	return "thermabox"
 }
 
 func (t *Thermabox) SetLimits(temperature float64, threshold float64) {
@@ -336,16 +375,18 @@ func (t *Thermabox) Run() error {
 			lastState = t.state
 		}
 
-		go func(temperature float64, timestamp int64, state interfaces.State) {
+		extras := t.GetAllTemperatures()
+		go func(temperature float64, timestamp int64, state interfaces.State, extras map[string]interface{}) {
 			tboxState := &interfaces.ThermaboxState{
 				temperature,
 				timestamp,
 				state,
+				extras,
 			}
 			for _, channel := range t.listeners {
 				channel <- tboxState
 			}
-		}(temp, now, t.state)
+		}(temp, now, t.state, extras)
 		t.mutex.Unlock()
 
 		log.Debugf("temp=%v", temp)

@@ -177,11 +177,12 @@ func IndexHandler(path string, w http.ResponseWriter, req *http.Request) error {
 func GetTemperatureHandler(webserver *Webserver, tbox thermabox_interfaces.ThermaboxInterface, w http.ResponseWriter, req *http.Request) error {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(200)
-	temp, err := tbox.GetTemperature()
+	data := tbox.GetAllTemperatures()
+	b, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	w.Write([]byte(fmt.Sprintf("%v", temp)))
+	w.Write(b)
 	return nil
 }
 

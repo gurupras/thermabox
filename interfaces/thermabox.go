@@ -11,12 +11,14 @@ const (
 
 type TemperatureSensorInterface interface {
 	GetTemperature() (float64, error)
+	GetName() string
 }
 
 type ThermaboxState struct {
-	Temperature float64 `json:"temperature"`
-	Timestamp   int64   `json:"timestamp"`
-	State       State   `json:"state"`
+	Temperature float64                `json:"temperature"`
+	Timestamp   int64                  `json:"timestamp"`
+	State       State                  `json:"state"`
+	Extras      map[string]interface{} `json:"extras"`
 }
 
 type ThermaboxListenerInterface interface {
@@ -29,6 +31,7 @@ type ThermaboxInterface interface {
 	SetLimits(temperature float64, threshold float64)
 	GetLimits() (temperature float64, threshold float64)
 	GetState() string
+	GetAllTemperatures() map[string]interface{}
 	DisableThermabox()
 	EnableThermabox()
 }
