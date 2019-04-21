@@ -58,9 +58,13 @@ func main() {
 	case "usb":
 		fallthrough
 	case "USB":
-		sensor, err = temperusb.New()
+		s, err := temperusb.New()
 		if err != nil {
 			log.Fatalf("Failed to acquire temperature sensor: %v", err)
+		}
+		sensor = &thermabox.ProbeTemperUSB{
+			s,
+			"usb-temperusb-sensor",
 		}
 	default:
 		// Assumes HTTP

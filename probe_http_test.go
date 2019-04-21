@@ -45,7 +45,7 @@ func TestProbeHTTP(t *testing.T) {
 		server.Serve(snl)
 	}()
 
-	probe := HTTPProbe{"http://localhost:31121/temp"}
+	probe := HTTPProbe{"http://localhost:31121/temp", "test"}
 	temp, err := probe.GetTemperature()
 	require.Nil(err)
 	require.Equal(testTemp, temp)
