@@ -156,7 +156,7 @@ func (d *DummyThermaboxInterface) SetLimits(temp float64, threshold float64) {
 	d.threshold = threshold
 }
 
-func (d *DummyThermaboxInterface) RegisterChannel (chan *thermabox_interfaces.ThermaboxState) {
+func (d *DummyThermaboxInterface) RegisterChannel (channel chan *thermabox_interfaces.ThermaboxState, name string) {
 }
 
 func (d *DummyThermaboxInterface) DisableThermabox() {

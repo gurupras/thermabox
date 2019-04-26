@@ -194,7 +194,8 @@ func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	return nil
 }
 
-func (t *Thermabox) RegisterChannel(c chan *interfaces.ThermaboxState) {
+func (t *Thermabox) RegisterChannel(c chan *interfaces.ThermaboxState, name string) {
+	log.Infof("Registered channel: %v", name)
 	t.listeners = append(t.listeners, c)
 }
 

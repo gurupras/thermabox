@@ -22,7 +22,7 @@ type ThermaboxState struct {
 }
 
 type ThermaboxListenerInterface interface {
-	RegisterChannel(chan *ThermaboxState)
+	RegisterChannel(chan *ThermaboxState, string)
 }
 
 type ThermaboxInterface interface {

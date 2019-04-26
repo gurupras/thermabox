@@ -191,7 +191,7 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 			}
 		}
 	}()
-	tbox.RegisterChannel(tboxChan)
+	tbox.RegisterChannel(tboxChan, "webserver-publish")
 
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
