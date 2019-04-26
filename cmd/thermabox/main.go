@@ -30,7 +30,7 @@ func main() {
 	}
 
 	if !easyfiles.Exists(*conf) {
-		log.Fatalf("Configuration file '%v' does not exist")
+		log.Fatalf("Configuration file '%v' does not exist", *conf)
 	}
 
 	tbox := thermabox.Thermabox{}

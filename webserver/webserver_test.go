@@ -12,12 +12,27 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/gurupras/go-stoppable-net-listener"
+	thermabox_interfaces "github.com/gurupras/thermabox/interfaces"
 	websockets "github.com/homesound/simple-websockets"
 	"github.com/parnurzeal/gorequest"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func createWebserver () (*Webserver, error) {
+	conf := `
+webserver:
+  port: 8080
+  path: ./..
+`
+	w := New()
+	err := yaml.Unmarshal([]byte(conf), w)
+	if err != nil {
+		return nil, err
+	}
+	return w, nil
+}
 
 func TestYAMLUnmarshal(t *testing.T) {
 	require := require.New(t)
@@ -28,8 +43,8 @@ webserver:
   port: 8080
   path: ./..
 `
-	w := Webserver{}
-	err := yaml.Unmarshal([]byte(conf), &w)
+	w := New()
+	err := yaml.Unmarshal([]byte(conf), w)
 	require.Nil(err)
 
 	assert.Equal(8080, w.Port)
@@ -39,8 +54,8 @@ webserver:
 port: 8080
 path: ./..
 `
-	w = Webserver{}
-	err = yaml.Unmarshal([]byte(conf), &w)
+	w = New()
+	err = yaml.Unmarshal([]byte(conf), w)
 	require.Nil(err)
 
 	assert.Equal(8080, w.Port)
@@ -55,19 +70,38 @@ webserver:
   port: 8080
   path: ./..
 `
-	w = Webserver{}
-	err = yaml.Unmarshal([]byte(conf), &w)
+	w = New()
+	err = yaml.Unmarshal([]byte(conf), w)
 	require.Nil(err)
 
 	assert.Equal(8080, w.Port)
 	assert.Equal("./..", w.Path)
 
+	conf = `
+webserver:
+  port: 8080
+  path: ./..
+  publish:
+    protocol: https
+    host: test
+    path: /api/test
+`
+	w = New()
+	err = yaml.Unmarshal([]byte(conf), w)
+	require.Nil(err)
+
+	assert.NotNil(w.Publish)
+	assert.Equal(w.Publish["protocol"], "https")
+	assert.Equal(w.Publish["host"], "test")
+	assert.Equal(w.Publish["path"], "/api/test")
 }
 
 func TestWebServer(t *testing.T) {
 	require := require.New(t)
 
-	handler, err := InitializeWebServer(".", "/", nil, nil)
+	w, err := createWebserver()
+	require.Nil(err)
+	handler, err := InitializeWebServer(".", "/", nil, nil, w)
 	require.Nil(err)
 	require.NotNil(handler)
 
@@ -107,6 +141,10 @@ func NewDummyThermaboxInterface() *DummyThermaboxInterface {
 	return &d
 }
 
+func (d *DummyThermaboxInterface) GetName () string {
+	return "dummy-thermabox"
+}
+
 func (d *DummyThermaboxInterface) GetTemperature() (float64, error) {
 	return d.currentTemp, nil
 }
@@ -117,6 +155,20 @@ func (d *DummyThermaboxInterface) SetLimits(temp float64, threshold float64) {
 	d.temperature = temp
 	d.threshold = threshold
 }
+
+func (d *DummyThermaboxInterface) RegisterChannel (chan *thermabox_interfaces.ThermaboxState) {
+}
+
+func (d *DummyThermaboxInterface) DisableThermabox() {
+}
+
+func (d *DummyThermaboxInterface) EnableThermabox() {
+}
+
+func (d *DummyThermaboxInterface) GetAllTemperatures() map[string]interface{} {
+	return nil
+}
+
 
 func (d *DummyThermaboxInterface) GetState() string {
 	temp, _ := d.GetTemperature()
@@ -132,7 +184,9 @@ func (d *DummyThermaboxInterface) GetState() string {
 func TestWebsockets(t *testing.T) {
 	require := require.New(t)
 
-	handler, err := InitializeWebServer(".", "/", NewDummyThermaboxInterface(), nil)
+	w, err := createWebserver()
+	require.Nil(err)
+	handler, err := InitializeWebServer(".", "/", NewDummyThermaboxInterface(), nil, w)
 	require.Nil(err)
 	require.NotNil(handler)
 
@@ -210,7 +264,9 @@ func TestWebsockets(t *testing.T) {
 func TestSubWebServer(t *testing.T) {
 	require := require.New(t)
 
-	handler, err := InitializeWebServer(".", "/webserver", nil, nil)
+	w, err := createWebserver()
+	require.Nil(err)
+	handler, err := InitializeWebServer(".", "/webserver", nil, nil, w)
 	require.Nil(err)
 	require.NotNil(handler)
 
@@ -240,7 +296,9 @@ func TestPOSTSetLimits(t *testing.T) {
 	require := require.New(t)
 
 	tbox := NewDummyThermaboxInterface()
-	handler, err := InitializeWebServer(".", "/", tbox, nil)
+	w, err := createWebserver()
+	require.Nil(err)
+	handler, err := InitializeWebServer(".", "/", tbox, nil, w)
 	require.Nil(err)
 	require.NotNil(handler)
 

@@ -19,6 +19,7 @@ import (
 	stoppablenetlistener "github.com/gurupras/go-stoppable-net-listener"
 	thermabox_interfaces "github.com/gurupras/thermabox/interfaces"
 	websockets "github.com/homesound/simple-websockets"
+	"github.com/fatih/structs"
 	"github.com/parnurzeal/gorequest"
 	"github.com/rs/cors"
 	log "github.com/sirupsen/logrus"
@@ -77,8 +78,12 @@ unmarshal:
 	} else {
 		w.Forward = ""
 	}
-	if publish, ok := m["publish"]; ok {
-		w.Publish = publish.(map[string]interface{})
+	if publishIf, ok := m["publish"]; ok {
+		publish := publishIf.(map[interface{}]interface{})
+		w.Publish = make(map[string]interface{})
+		w.Publish["protocol"] = publish["protocol"].(string)
+		w.Publish["host"] = publish["host"].(string)
+		w.Publish["path"] = publish["path"].(string)
 	}
 
 	if httpsIf, ok := m["https"]; ok {
@@ -130,31 +135,52 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 	var protocol string
 	var publishURL string
 	var websocketConn *websocket.Conn
+
+	connectWebsocket := func () {
+		var err error
+		websocketConn, _, err = websocket.DefaultDialer.Dial(publishURL, nil)
+		if err != nil {
+			log.Errorf("dial: %v", err)
+		}
+	}
+
 	if w.Publish != nil {
-		protocol := w.Publish["protocol"]
+		protocol = w.Publish["protocol"].(string)
 		host := w.Publish["host"].(string)
 		path := w.Publish["path"].(string)
-		u := url.URL{Scheme: "ws", Host: host, Path: path}
+		u := url.URL{Scheme: protocol, Host: host, Path: path}
 		publishURL = u.String()
-
+		log.Infof("Publishing temperatures to: %v", publishURL)
 		switch protocol {
 		case "ws":
+			fallthrough
+		case "wss":
 			log.Debugf("connecting to %s", u.String())
-			websocketConn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
-			if err != nil {
-				log.Fatal("dial:", err)
-			}
-			defer websocketConn.Close()
+			connectWebsocket()
 			break
 		}
 	}
 
 	go func() {
 		for data := range tboxChan {
+			s := structs.New(data)
+			s.TagName = "json"
+			m := s.Map()
+			m["type"] = "thermabox-data"
 			if w.Publish != nil {
 				switch protocol {
 				case "ws":
-					websocketConn.WriteJSON(data)
+					fallthrough
+				case "wss":
+					b, err := json.Marshal(m)
+					if err != nil {
+						log.Errorf("Failed marshalling JSON data: %v: %v", data, err)
+						continue
+					}
+					if err := websocketConn.WriteMessage(websocket.TextMessage, b); err != nil {
+						log.Errorf("Failed to publish: %v", err)
+						connectWebsocket()
+					}
 					break
 				case "http":
 					fallthrough
