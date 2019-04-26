@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/gorilla/websocket"
 	"github.com/gorilla/mux"
 	stoppablenetlistener "github.com/gurupras/go-stoppable-net-listener"
 	thermabox_interfaces "github.com/gurupras/thermabox/interfaces"
@@ -23,11 +25,11 @@ import (
 )
 
 type Webserver struct {
-	Port    int               `yaml:"port"`
-	Path    string            `yaml:"path"`
-	Forward string            `yaml:"forward"`
-	Publish string            `yaml:"publish"`
-	Https   map[string]string `yaml:"https"`
+	Port    int                    `yaml:"port"`
+	Path    string                 `yaml:"path"`
+	Forward string                 `yaml:"forward"`
+	Publish map[string]interface{} `yaml:"publish"`
+	Https   map[string]string      `yaml:"https"`
 	snl     *stoppablenetlistener.StoppableNetListener
 }
 
@@ -76,10 +78,9 @@ unmarshal:
 		w.Forward = ""
 	}
 	if publish, ok := m["publish"]; ok {
-		w.Publish = publish.(string)
-	} else {
-		w.Publish = ""
+		w.Publish = publish.(map[string]interface{})
 	}
+
 	if httpsIf, ok := m["https"]; ok {
 		// Parse HTTPS files
 		https := httpsIf.(map[interface{}]interface{})
@@ -91,7 +92,7 @@ unmarshal:
 
 func (w *Webserver) Stop() {
 	if w.snl != nil {
-		log.Info("Stopping webserver on port: %v", w.Port)
+		log.Infof("Stopping webserver on port: %v", w.Port)
 		w.snl.Stop()
 		w.snl = nil
 	}
@@ -124,10 +125,43 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 
 	// Register a channel with thermabox to receive updated
 	tboxChan := make(chan *thermabox_interfaces.ThermaboxState, 0)
+
+
+	var protocol string
+	var publishURL string
+	var websocketConn *websocket.Conn
+	if w.Publish != nil {
+		protocol := w.Publish["protocol"]
+		host := w.Publish["host"].(string)
+		path := w.Publish["path"].(string)
+		u := url.URL{Scheme: "ws", Host: host, Path: path}
+		publishURL = u.String()
+
+		switch protocol {
+		case "ws":
+			log.Debugf("connecting to %s", u.String())
+			websocketConn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+			if err != nil {
+				log.Fatal("dial:", err)
+			}
+			defer websocketConn.Close()
+			break
+		}
+	}
+
 	go func() {
 		for data := range tboxChan {
-			if strings.Compare(w.Publish, "") != 0 {
-				gorequest.New().Post(w.Publish).Send(data).End()
+			if w.Publish != nil {
+				switch protocol {
+				case "ws":
+					websocketConn.WriteJSON(data)
+					break
+				case "http":
+					fallthrough
+				case "https":
+					gorequest.New().Post(publishURL).Send(data).End()
+					break
+				}
 			}
 		}
 	}()
@@ -143,7 +177,7 @@ func (w *Webserver) Start(tbox thermabox_interfaces.ThermaboxInterface) {
 		log.Fatalf("%v", err)
 	}
 	w.snl = snl
-	log.Info("Starting webserver on port: %v", w.Port)
+	log.Infof("Starting webserver on port: %v", w.Port)
 	if len(w.Https) == 0 {
 		// Only HTTP server
 		server.Serve(snl)
