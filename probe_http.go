@@ -20,7 +20,7 @@ func (p *HTTPProbe) Initialize() error {
 
 func (p *HTTPProbe) GetTemperature() (float64, error) {
 	var err error
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		var bodyStr string
 		var temp float64
 		var _err error
