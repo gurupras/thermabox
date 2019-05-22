@@ -7,6 +7,10 @@ type ProbeTemperUSB struct {
   Name string
 }
 
+func (p *ProbeTemperUSB) Initialize() error {
+  return nil
+}
+
 func (p *ProbeTemperUSB) GetName() string {
   return p.Name
 }

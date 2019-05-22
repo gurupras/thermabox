@@ -14,6 +14,10 @@ type HTTPProbe struct {
 	Name string `yaml:"name"`
 }
 
+func (p *HTTPProbe) Initialize() error {
+	return nil
+}
+
 func (p *HTTPProbe) GetTemperature() (float64, error) {
 	var err error
 	for i := 0; i < 5; i++ {

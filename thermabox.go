@@ -98,6 +98,10 @@ type Thermabox struct {
 	mutex                sync.Mutex
 }
 
+func (t *Thermabox) Initialize() error {
+	return nil
+}
+
 func (t *Thermabox) UnmarshalYAML(unmarshal func(i interface{}) error) error {
 	m := make(map[string]interface{})
 

@@ -10,6 +10,7 @@ const (
 )
 
 type TemperatureSensorInterface interface {
+	Initialize() error
 	GetTemperature() (float64, error)
 	GetName() string
 }

@@ -3,7 +3,7 @@ package main
 import (
 	"io/ioutil"
 	"os"
-
+	"strings"
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/alecthomas/kingpin"
@@ -19,6 +19,7 @@ var (
 	conf         = app.Arg("conf", "Configuration file (YAML)").Required().String()
 	verbose      = app.Flag("verbose", "Verbose logging").Short('v').Default("false").Bool()
 	sensorSource = app.Flag("sensor", "Temperature sensor source").Short('S').Default("usb").String()
+	sensorURL    = app.Flag("url", "Temperature sensor URL if source is HTTP or WS").String()
 	temperature  = app.Flag("temperature", "Override conf temperature").Short('t').Default("-100").Float64()
 	threshold    = app.Flag("threshold", "Override conf threshold").Short('T').Default("-100").Float64()
 )
@@ -54,10 +55,9 @@ func main() {
 
 	// Get a hold of the temperature sensor
 	var sensor interfaces.TemperatureSensorInterface
-	switch *sensorSource {
+	finalSensorSource := strings.ToLower(*sensorSource)
+	switch finalSensorSource {
 	case "usb":
-		fallthrough
-	case "USB":
 		s, err := temperusb.New()
 		if err != nil {
 			log.Fatalf("Failed to acquire temperature sensor: %v", err)
@@ -66,12 +66,20 @@ func main() {
 			s,
 			"usb-temperusb-sensor",
 		}
+	case "ws":
+		sensor = &thermabox.WSProbe{
+			Url: *sensorURL,
+			Name: "thermabox-probe",
+		}
 	default:
 		// Assumes HTTP
 		sensor = &thermabox.HTTPProbe{
-			Url: *sensorSource,
+			Url: *sensorURL,
 			Name: "thermabox-probe",
 		}
+	}
+	if err := sensor.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize sensor: %v\n", err)
 	}
 	tbox.SetProbe(sensor)
 
