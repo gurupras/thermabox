@@ -27,9 +27,16 @@ func (p *WSProbe) Initialize() error {
 func (p *WSProbe) GetTemperature() (float64, error) {
 	var err error
 	var temp float64
-	var bodyStr string
+	var (
+		body []byte
+		bodyStr string
+	)
 	for i := 0; i < 5; i++ {
-		_, body, err := p.conn.ReadMessage()
+		if err := p.conn.WriteMessage(websocket.TextMessage, []byte("temp")); err != nil {
+			fmt.Errorf("Failed to request temperature from probe: %v\n", err)
+			goto retry
+		}
+		_, body, err = p.conn.ReadMessage()
 		if err != nil {
 			fmt.Errorf("Failed to get temperature: %v", err)
 			goto retry
