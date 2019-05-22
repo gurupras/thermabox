@@ -19,7 +19,7 @@ var (
 	conf         = app.Arg("conf", "Configuration file (YAML)").Required().String()
 	verbose      = app.Flag("verbose", "Verbose logging").Short('v').Default("false").Bool()
 	sensorSource = app.Flag("sensor", "Temperature sensor source").Short('S').Default("usb").String()
-	sensorURL    = app.Flag("url", "Temperature sensor URL if source is HTTP or WS").String()
+	sensorURL    = app.Flag("url", "Temperature sensor URL if source is HTTP or WS").Short('U').String()
 	temperature  = app.Flag("temperature", "Override conf temperature").Short('t').Default("-100").Float64()
 	threshold    = app.Flag("threshold", "Override conf threshold").Short('T').Default("-100").Float64()
 )
